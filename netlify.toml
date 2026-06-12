@@ -1,0 +1,22 @@
+[build]
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/crear-preferencia"
+  to = "/.netlify/functions/crear-preferencia"
+  status = 200
+
+[[redirects]]
+  from = "/pago-exitoso"
+  to = "/pago-exitoso.html"
+  status = 200
+
+[[redirects]]
+  from = "/pago-fallido"
+  to = "/pago-fallido.html"
+  status = 200
+
+[[redirects]]
+  from = "/pago-pendiente"
+  to = "/pago-pendiente.html"
+  status = 200

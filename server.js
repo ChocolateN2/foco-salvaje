@@ -7,22 +7,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Servir los archivos estáticos (index.html, css, js)
 app.use(express.static(path.join(__dirname)));
 
-// Configuración de MercadoPago
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
   options: { timeout: 5000 }
 });
 
-// Endpoint para crear la preferencia de pago
+const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : 'http://localhost:3000';
+
 app.post('/crear-preferencia', async (req, res) => {
   try {
     const { items } = req.body;
-
     const preference = new Preference(client);
-
     const result = await preference.create({
       body: {
         items: items.map(item => ({
@@ -33,23 +32,20 @@ app.post('/crear-preferencia', async (req, res) => {
           currency_id: 'ARS',
         })),
         back_urls: {
-          success: 'http://localhost:3000/pago-exitoso',
-          failure: 'http://localhost:3000/pago-fallido',
-          pending: 'http://localhost:3000/pago-pendiente',
+          success: `${BASE_URL}/pago-exitoso`,
+          failure: `${BASE_URL}/pago-fallido`,
+          pending: `${BASE_URL}/pago-pendiente`,
         },
         statement_descriptor: 'Foco Salvaje',
       }
     });
-
-    res.json({ init_point: result.sandbox_init_point, id: result.id });
-
+    res.json({ init_point: result.init_point, id: result.id });
   } catch (error) {
     console.error('Error al crear preferencia:', error);
     res.status(500).json({ error: 'Error al procesar el pago' });
   }
 });
 
-// Páginas de respuesta del pago
 app.get('/pago-exitoso', (req, res) => {
   res.send(`
     <html><head><meta charset="UTF-8">
@@ -95,8 +91,8 @@ app.get('/pago-pendiente', (req, res) => {
   `);
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`✓ Abrí http://localhost:${PORT} en tu navegador`);
+  console.log(`✓ Servidor corriendo en puerto ${PORT}`);
+  console.log(`✓ URL pública: ${BASE_URL}`);
 });

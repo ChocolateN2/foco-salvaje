@@ -2,8 +2,9 @@
   "name": "foco-salvaje",
   "version": "1.0.0",
   "description": "Sitio web para venta de fotos del Campeonato de Pesca 2025.",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

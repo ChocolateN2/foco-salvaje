@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MercadoPagoConfig, Preference } = require('mercadopago');
+const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const mysql = require('mysql2/promise');
 const path = require('path');
 
@@ -18,7 +18,6 @@ const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : 'http://localhost:8080';
 
-// Conexión a MySQL
 const dbConfig = {
   host: process.env.MYSQLHOST,
   port: process.env.MYSQLPORT || 3306,
@@ -38,6 +37,8 @@ async function initDB() {
         fotos TEXT NOT NULL,
         total DECIMAL(10,2) NOT NULL,
         estado VARCHAR(50) DEFAULT 'pendiente',
+        mp_preference_id VARCHAR(255),
+        mp_payment_id VARCHAR(255),
         fecha DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -53,24 +54,6 @@ initDB();
 app.post('/crear-preferencia', async (req, res) => {
   try {
     const { items, buyer } = req.body;
-
-    // Guardar pedido en MySQL
-    if (buyer && buyer.name && buyer.email) {
-      try {
-        const conn = await mysql.createConnection(dbConfig);
-        const fotos = items.map(i => i.name).join(', ');
-        const total = items.reduce((s, i) => s + i.price, 0);
-        await conn.execute(
-          'INSERT INTO pedidos (nombre, email, fotos, total, estado) VALUES (?, ?, ?, ?, ?)',
-          [buyer.name, buyer.email, fotos, total, 'pendiente']
-        );
-        await conn.end();
-        console.log(`✓ Pedido guardado: ${buyer.name} - ${buyer.email}`);
-      } catch (dbErr) {
-        console.error('Error guardando pedido:', dbErr.message);
-      }
-    }
-
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
@@ -87,9 +70,26 @@ app.post('/crear-preferencia', async (req, res) => {
           failure: `${BASE_URL}/pago-fallido`,
           pending: `${BASE_URL}/pago-pendiente`,
         },
+        notification_url: `${BASE_URL}/webhook`,
         statement_descriptor: 'Foco Salvaje',
       }
     });
+
+    if (buyer && buyer.name && buyer.email) {
+      try {
+        const conn = await mysql.createConnection(dbConfig);
+        const fotos = items.map(i => i.name).join(', ');
+        const total = items.reduce((s, i) => s + i.price, 0);
+        await conn.execute(
+          'INSERT INTO pedidos (nombre, email, fotos, total, estado, mp_preference_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [buyer.name, buyer.email, fotos, total, 'pendiente', result.id]
+        );
+        await conn.end();
+        console.log(`✓ Pedido guardado: ${buyer.name} - ${buyer.email}`);
+      } catch (dbErr) {
+        console.error('Error guardando pedido:', dbErr.message);
+      }
+    }
 
     res.json({ init_point: result.init_point, id: result.id });
 
@@ -99,7 +99,40 @@ app.post('/crear-preferencia', async (req, res) => {
   }
 });
 
-// Panel de pedidos para Cristian
+// Webhook de MercadoPago
+app.post('/webhook', async (req, res) => {
+  try {
+    const { type, data } = req.body;
+    console.log('Webhook recibido:', type, data);
+
+    if (type === 'payment' && data && data.id) {
+      const payment = new Payment(client);
+      const paymentInfo = await payment.get({ id: data.id });
+
+      console.log(`✓ Pago ${data.id} - Estado: ${paymentInfo.status}`);
+
+      let estado = 'pendiente';
+      if (paymentInfo.status === 'approved') estado = 'exitoso';
+      if (paymentInfo.status === 'rejected') estado = 'fallido';
+
+      if (paymentInfo.preference_id) {
+        const conn = await mysql.createConnection(dbConfig);
+        await conn.execute(
+          'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
+          [estado, String(data.id), paymentInfo.preference_id]
+        );
+        await conn.end();
+        console.log(`✓ Pedido actualizado a: ${estado}`);
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Error en webhook:', err);
+    res.sendStatus(500);
+  }
+});
+
 app.get('/pedidos', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -228,4 +261,5 @@ app.listen(PORT, () => {
   console.log(`✓ Servidor corriendo en puerto ${PORT}`);
   console.log(`✓ URL pública: ${BASE_URL}`);
   console.log(`✓ Panel de pedidos: ${BASE_URL}/pedidos`);
+  console.log(`✓ Webhook: ${BASE_URL}/webhook`);
 });

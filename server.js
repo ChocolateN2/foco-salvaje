@@ -159,7 +159,7 @@ app.get('/fs2026admin', (req, res) => {
 </style></head>
 <body><div class="card">
   <div class="logo">
-    <div class="logo-icon">🎣</div>
+    <img src="/assets/logo.jpg" style="width:100px;height:100px;object-fit:contain;border-radius:12px;margin-bottom:12px">
     <h1>Foco Salvaje</h1>
     <p>Panel de administración</p>
   </div>

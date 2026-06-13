@@ -15,7 +15,7 @@ goTo('inicio');
 function toggleMobileNav(){document.getElementById('navMobile').classList.toggle('open');}
 
 const photos=[
-  {id:1,name:'Juan Pérez - Lanzamiento',cat:'accion',price:1500,img:'assets/pez1.jpg'},
+  {id:1,name:'Juan Pérez - Lanzamiento',cat:'accion',price:1,img:'assets/pez1.jpg'},
   {id:2,name:'Captura del día',cat:'accion',price:1500,img:'assets/foto22.jpg'},
   {id:3,name:'Orilla al amanecer',cat:'paisaje',price:1500,bg:'g3'},
   {id:4,name:'El campeón',cat:'retrato',price:1500,bg:'g4'},

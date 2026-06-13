@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const session = require('express-session');
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const mysql = require('mysql2/promise');
 const path = require('path');
@@ -7,7 +8,15 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
+
+app.use(session({
+  secret: 'focosalvaje_secret_2026',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 8 } // 8 horas
+}));
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
@@ -133,29 +142,54 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Panel de pedidos protegido con contraseña
+// Login del panel
+app.get('/admin/login', (req, res) => {
+  const error = req.query.error ? '<p style="color:#c0392b;margin-bottom:12px;font-size:13px">Contraseña incorrecta</p>' : '';
+  res.send(`
+    <html><head><meta charset="UTF-8">
+    <style>
+      body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}
+      .box{background:white;padding:40px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08);text-align:center;min-width:300px}
+      h2{color:#04342C;margin-bottom:8px;font-family:serif;font-size:22px}
+      .sub{color:#9C9C94;font-size:13px;margin-bottom:24px}
+      label{display:block;text-align:left;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#9C9C94;margin-bottom:6px}
+      input{padding:10px 14px;border:1px solid rgba(4,52,44,0.15);border-radius:4px;font-size:14px;width:100%;box-sizing:border-box;outline:none;margin-bottom:16px}
+      input:focus{border-color:#1D9E75}
+      button{width:100%;background:#04342C;color:white;border:none;padding:12px;border-radius:4px;cursor:pointer;font-size:14px;font-family:sans-serif;font-weight:500}
+      button:hover{background:#0F6E56}
+    </style></head>
+    <body><div class="box">
+      <h2>🔒 Foco Salvaje</h2>
+      <p class="sub">Panel de administración</p>
+      ${error}
+      <form action="/admin/login" method="post">
+        <label>Contraseña</label>
+        <input type="password" name="pass" placeholder="••••••••" autofocus>
+        <button type="submit">Ingresar</button>
+      </form>
+    </div></body></html>
+  `);
+});
+
+app.post('/admin/login', (req, res) => {
+  const { pass } = req.body;
+  if (pass === 'Cuncarop12') {
+    req.session.admin = true;
+    res.redirect('/pedidos');
+  } else {
+    res.redirect('/admin/login?error=1');
+  }
+});
+
+app.get('/admin/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/admin/login');
+});
+
+// Panel de pedidos
 app.get('/pedidos', async (req, res) => {
-  const { pass } = req.query;
-  if (pass !== 'Cuncarop12') {
-    return res.send(`
-      <html><head><meta charset="UTF-8">
-      <style>
-        body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}
-        .box{background:white;padding:40px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08);text-align:center;min-width:280px}
-        h2{color:#04342C;margin-bottom:20px;font-family:serif}
-        input{padding:10px 14px;border:1px solid rgba(4,52,44,0.15);border-radius:4px;font-size:14px;width:200px;outline:none}
-        input:focus{border-color:#1D9E75}
-        button{display:block;margin:12px auto 0;background:#04342C;color:white;border:none;padding:10px 28px;border-radius:4px;cursor:pointer;font-size:14px;font-family:sans-serif}
-        button:hover{background:#0F6E56}
-      </style></head>
-      <body><div class="box">
-        <h2>🔒 Panel de pedidos</h2>
-        <form action="/pedidos" method="get">
-          <input type="password" name="pass" placeholder="Contraseña" autofocus>
-          <button type="submit">Entrar</button>
-        </form>
-      </div></body></html>
-    `);
+  if (!req.session.admin) {
+    return res.redirect('/admin/login');
   }
 
   try {
@@ -172,7 +206,10 @@ app.get('/pedidos', async (req, res) => {
       <title>Pedidos — Foco Salvaje</title>
       <style>
         body{font-family:'DM Sans',sans-serif;background:#F4EFE6;margin:0;padding:24px}
-        h1{font-family:serif;color:#04342C;margin-bottom:24px}
+        .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+        h1{font-family:serif;color:#04342C;margin:0}
+        .logout{background:transparent;border:1px solid rgba(4,52,44,0.2);color:#04342C;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;text-decoration:none}
+        .logout:hover{background:rgba(4,52,44,0.05)}
         .stats{display:flex;gap:16px;margin-bottom:24px}
         .stat{background:white;padding:16px 24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
         .stat-num{font-size:28px;font-weight:700;color:#04342C}
@@ -189,7 +226,10 @@ app.get('/pedidos', async (req, res) => {
       </style>
     </head>
     <body>
-      <h1>📋 Pedidos — Foco Salvaje</h1>
+      <div class="top">
+        <h1>📋 Pedidos — Foco Salvaje</h1>
+        <a class="logout" href="/admin/logout">Cerrar sesión</a>
+      </div>
       <div class="stats">
         <div class="stat">
           <div class="stat-num">${rows.length}</div>
@@ -236,48 +276,15 @@ app.get('/pedidos', async (req, res) => {
 });
 
 app.get('/pago-exitoso', (req, res) => {
-  res.send(`
-    <html><head><meta charset="UTF-8">
-    <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}
-    .box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
-    h1{color:#1D9E75;font-size:28px;margin-bottom:12px} p{color:#5C5C58;margin-bottom:24px}
-    a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head>
-    <body><div class="box">
-      <h1>✓ Pago exitoso</h1>
-      <p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p>
-      <a href="/">Volver a la galería</a>
-    </div></body></html>
-  `);
+  res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });
 
 app.get('/pago-fallido', (req, res) => {
-  res.send(`
-    <html><head><meta charset="UTF-8">
-    <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}
-    .box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
-    h1{color:#c0392b;font-size:28px;margin-bottom:12px} p{color:#5C5C58;margin-bottom:24px}
-    a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head>
-    <body><div class="box">
-      <h1>✕ Pago fallido</h1>
-      <p>Hubo un problema con el pago.<br>Por favor intentá de nuevo.</p>
-      <a href="/">Volver a la galería</a>
-    </div></body></html>
-  `);
+  res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#c0392b;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✕ Pago fallido</h1><p>Hubo un problema con el pago.<br>Por favor intentá de nuevo.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });
 
 app.get('/pago-pendiente', (req, res) => {
-  res.send(`
-    <html><head><meta charset="UTF-8">
-    <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}
-    .box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
-    h1{color:#f39c12;font-size:28px;margin-bottom:12px} p{color:#5C5C58;margin-bottom:24px}
-    a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head>
-    <body><div class="box">
-      <h1>⏳ Pago pendiente</h1>
-      <p>Tu pago está siendo procesado.<br>Te avisaremos cuando se confirme.</p>
-      <a href="/">Volver a la galería</a>
-    </div></body></html>
-  `);
+  res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#f39c12;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>⏳ Pago pendiente</h1><p>Tu pago está siendo procesado.<br>Te avisaremos cuando se confirme.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });
 
 const PORT = process.env.PORT || 8080;

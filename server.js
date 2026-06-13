@@ -169,7 +169,7 @@ app.get('/fs2026admin', (req, res) => {
     <input type="password" name="pass" placeholder="••••••••" autofocus>
     <button type="submit">Ingresar al panel</button>
   </form>
-  <p class="footer">Solo para uso de Cristian Cicconofri</p>
+
 </div></body></html>`);
 });
 
@@ -391,12 +391,15 @@ app.get('/fs2026pedidos', async (req, res) => {
       </table>
     </div>
     ${totalPages > 1 ? `
-    <div class="pagination" style="padding:16px">
-      ${page > 1 ? `<a class="page-btn" href="/fs2026pedidos?${qStr({page: page-1})}">← Anterior</a>` : ''}
-      ${Array.from({length: totalPages}, (_,i) => i+1).map(p => `
-        <a class="page-btn ${p===page?'active':''}" href="/fs2026pedidos?${qStr({page: p})}">${p}</a>
-      `).join('')}
-      ${page < totalPages ? `<a class="page-btn" href="/fs2026pedidos?${qStr({page: page+1})}">Siguiente →</a>` : ''}
+    <div style="padding:16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div style="font-size:13px;color:#6b7280">Página <strong>${page}</strong> de <strong>${totalPages}</strong></div>
+      <div class="pagination">
+        ${page > 1 ? `<a class="page-btn" href="/fs2026pedidos?${qStr({page: page-1})}">← Anterior</a>` : ''}
+        ${Array.from({length: Math.min(totalPages,7)}, (_,i) => i+1).map(p => `
+          <a class="page-btn ${p===page?'active':''}" href="/fs2026pedidos?${qStr({page: p})}">${p}</a>
+        `).join('')}
+        ${page < totalPages ? `<a class="page-btn" href="/fs2026pedidos?${qStr({page: page+1})}">Siguiente →</a>` : ''}
+      </div>
     </div>` : ''}
   </div>`}
 </div>

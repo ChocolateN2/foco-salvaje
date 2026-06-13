@@ -15,7 +15,7 @@ app.use(session({
   secret: 'focosalvaje_secret_2026',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 8 } // 8 horas
+  cookie: { maxAge: 1000 * 60 * 60 * 8 }
 }));
 
 const client = new MercadoPagoConfig({
@@ -112,18 +112,12 @@ app.post('/crear-preferencia', async (req, res) => {
 app.post('/webhook', async (req, res) => {
   try {
     const { type, data } = req.body;
-    console.log('Webhook recibido:', type, data);
-
     if (type === 'payment' && data && data.id) {
       const payment = new Payment(client);
       const paymentInfo = await payment.get({ id: data.id });
-
-      console.log(`✓ Pago ${data.id} - Estado: ${paymentInfo.status}`);
-
       let estado = 'pendiente';
       if (paymentInfo.status === 'approved') estado = 'exitoso';
       if (paymentInfo.status === 'rejected') estado = 'fallido';
-
       if (paymentInfo.preference_id) {
         const conn = await mysql.createConnection(dbConfig);
         await conn.execute(
@@ -134,7 +128,6 @@ app.post('/webhook', async (req, res) => {
         console.log(`✓ Pedido actualizado a: ${estado}`);
       }
     }
-
     res.sendStatus(200);
   } catch (err) {
     console.error('Error en webhook:', err);
@@ -142,8 +135,8 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Login del panel
-app.get('/admin/login', (req, res) => {
+// Login secreto
+app.get('/fs2026admin', (req, res) => {
   const error = req.query.error ? '<p style="color:#c0392b;margin-bottom:12px;font-size:13px">Contraseña incorrecta</p>' : '';
   res.send(`
     <html><head><meta charset="UTF-8">
@@ -162,7 +155,7 @@ app.get('/admin/login', (req, res) => {
       <h2>🔒 Foco Salvaje</h2>
       <p class="sub">Panel de administración</p>
       ${error}
-      <form action="/admin/login" method="post">
+      <form action="/fs2026admin" method="post">
         <label>Contraseña</label>
         <input type="password" name="pass" placeholder="••••••••" autofocus>
         <button type="submit">Ingresar</button>
@@ -171,25 +164,25 @@ app.get('/admin/login', (req, res) => {
   `);
 });
 
-app.post('/admin/login', (req, res) => {
+app.post('/fs2026admin', (req, res) => {
   const { pass } = req.body;
   if (pass === 'Cuncarop12') {
     req.session.admin = true;
-    res.redirect('/pedidos');
+    res.redirect('/fs2026pedidos');
   } else {
-    res.redirect('/admin/login?error=1');
+    res.redirect('/fs2026admin?error=1');
   }
 });
 
-app.get('/admin/logout', (req, res) => {
+app.get('/fs2026logout', (req, res) => {
   req.session.destroy();
-  res.redirect('/admin/login');
+  res.redirect('/fs2026admin');
 });
 
-// Panel de pedidos
-app.get('/pedidos', async (req, res) => {
+// Panel de pedidos secreto
+app.get('/fs2026pedidos', async (req, res) => {
   if (!req.session.admin) {
-    return res.redirect('/admin/login');
+    return res.redirect('/fs2026admin');
   }
 
   try {
@@ -207,14 +200,15 @@ app.get('/pedidos', async (req, res) => {
       <style>
         body{font-family:'DM Sans',sans-serif;background:#F4EFE6;margin:0;padding:24px}
         .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
-        h1{font-family:serif;color:#04342C;margin:0}
-        .logout{background:transparent;border:1px solid rgba(4,52,44,0.2);color:#04342C;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;text-decoration:none}
+        h1{font-family:serif;color:#04342C;margin:0;font-size:24px}
+        .logout{background:transparent;border:1px solid rgba(4,52,44,0.2);color:#04342C;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
         .logout:hover{background:rgba(4,52,44,0.05)}
-        .stats{display:flex;gap:16px;margin-bottom:24px}
+        .stats{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
         .stat{background:white;padding:16px 24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
         .stat-num{font-size:28px;font-weight:700;color:#04342C}
         .stat-label{font-size:12px;color:#9C9C94;margin-top:4px}
-        table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+        .table-wrap{overflow-x:auto}
+        table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);min-width:600px}
         th{background:#04342C;color:white;padding:12px 16px;text-align:left;font-size:13px}
         td{padding:12px 16px;border-bottom:1px solid #f0ece4;font-size:13px}
         tr:last-child td{border-bottom:none}
@@ -222,13 +216,13 @@ app.get('/pedidos', async (req, res) => {
         .pendiente{background:#fff3cd;color:#856404}
         .exitoso{background:#d1e7dd;color:#0f5132}
         .fallido{background:#f8d7da;color:#842029}
-        .empty{text-align:center;padding:48px;color:#9C9C94}
+        .empty{text-align:center;padding:48px;color:#9C9C94;background:white;border-radius:8px}
       </style>
     </head>
     <body>
       <div class="top">
         <h1>📋 Pedidos — Foco Salvaje</h1>
-        <a class="logout" href="/admin/logout">Cerrar sesión</a>
+        <a class="logout" href="/fs2026logout">Cerrar sesión</a>
       </div>
       <div class="stats">
         <div class="stat">
@@ -241,6 +235,7 @@ app.get('/pedidos', async (req, res) => {
         </div>
       </div>
       ${rows.length === 0 ? '<div class="empty">No hay pedidos todavía</div>' : `
+      <div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -265,7 +260,8 @@ app.get('/pedidos', async (req, res) => {
             <td>${new Date(r.fecha).toLocaleString('es-AR')}</td>
           </tr>`).join('')}
         </tbody>
-      </table>`}
+      </table>
+      </div>`}
     </body>
     </html>`;
 
@@ -274,6 +270,10 @@ app.get('/pedidos', async (req, res) => {
     res.status(500).send('Error conectando a la base de datos');
   }
 });
+
+// Rutas viejas devuelven 404
+app.get('/pedidos', (req, res) => res.status(404).send('Not found'));
+app.get('/admin/login', (req, res) => res.status(404).send('Not found'));
 
 app.get('/pago-exitoso', (req, res) => {
   res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
@@ -291,6 +291,6 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`✓ Servidor corriendo en puerto ${PORT}`);
   console.log(`✓ URL pública: ${BASE_URL}`);
-  console.log(`✓ Panel de pedidos: ${BASE_URL}/pedidos`);
+  console.log(`✓ Panel admin: ${BASE_URL}/fs2026admin`);
   console.log(`✓ Webhook: ${BASE_URL}/webhook`);
 });

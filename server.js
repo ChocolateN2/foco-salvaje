@@ -133,7 +133,31 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
+// Panel de pedidos protegido con contraseña
 app.get('/pedidos', async (req, res) => {
+  const { pass } = req.query;
+  if (pass !== 'Cuncarop12') {
+    return res.send(`
+      <html><head><meta charset="UTF-8">
+      <style>
+        body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}
+        .box{background:white;padding:40px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08);text-align:center;min-width:280px}
+        h2{color:#04342C;margin-bottom:20px;font-family:serif}
+        input{padding:10px 14px;border:1px solid rgba(4,52,44,0.15);border-radius:4px;font-size:14px;width:200px;outline:none}
+        input:focus{border-color:#1D9E75}
+        button{display:block;margin:12px auto 0;background:#04342C;color:white;border:none;padding:10px 28px;border-radius:4px;cursor:pointer;font-size:14px;font-family:sans-serif}
+        button:hover{background:#0F6E56}
+      </style></head>
+      <body><div class="box">
+        <h2>🔒 Panel de pedidos</h2>
+        <form action="/pedidos" method="get">
+          <input type="password" name="pass" placeholder="Contraseña" autofocus>
+          <button type="submit">Entrar</button>
+        </form>
+      </div></body></html>
+    `);
+  }
+
   try {
     const conn = await mysql.createConnection(dbConfig);
     const [rows] = await conn.execute('SELECT * FROM pedidos ORDER BY fecha DESC');

@@ -67,7 +67,7 @@ function updateLB(){
   const p=lbList[lbCurrent];
   document.getElementById('lbImg').className='lb-img '+(p.bg||'');
   document.getElementById('lbImg').innerHTML=p.img
-    ? `<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`
+    ? `<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">`
     : `<div style="opacity:.15">${cam(80)}</div>`;
   document.getElementById('lbNum').textContent='#'+String(p.id).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
   document.getElementById('lbName').textContent=p.name;

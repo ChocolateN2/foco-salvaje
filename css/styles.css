@@ -63,12 +63,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .photo-card:hover img{transform:scale(1.06)}
 .photo-thumb-wrap img{transition:transform 0.5s ease}
 
-/* Overlay al hacer hover */
-.photo-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(4,52,44,0.85) 0%,transparent 60%);opacity:0;transition:opacity 0.3s;display:flex;flex-direction:column;justify-content:flex-end;padding:14px}
-.photo-card:hover .photo-overlay{opacity:1}
-.photo-overlay-price{font-size:20px;font-weight:700;color:white;line-height:1}
-.photo-overlay-btn{margin-top:8px;background:var(--v3);color:white;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:background 0.2s;width:100%}
-.photo-overlay-btn:hover{background:#159965}
+
 
 .g1{background:linear-gradient(145deg,#04342C,#0F6E56)}.g2{background:linear-gradient(145deg,#0C447C,#378ADD)}.g3{background:linear-gradient(145deg,#085041,#5DCAA5)}.g4{background:linear-gradient(145deg,#185FA5,#9FE1CB)}.g5{background:linear-gradient(145deg,#04342C,#185FA5 50%,#1D9E75)}.g6{background:linear-gradient(145deg,#0F6E56,#378ADD)}.g7{background:linear-gradient(145deg,#042C53,#1D9E75)}.g8{background:linear-gradient(145deg,#085041,#0C447C)}
 

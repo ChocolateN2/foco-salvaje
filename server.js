@@ -159,8 +159,8 @@ app.get('/fs2026admin', (req, res) => {
 </style></head>
 <body><div class="card">
   <div class="logo">
-    <div class="logo-icon">🎣</div>
-    <h1>Foco Salvaje</h1>
+    <img src="/assets/logo.jpg" style="width:120px;height:120px;object-fit:contain;margin-bottom:12px">
+    <h1>FocoSalvaje</h1>
     <p>Panel de administración</p>
   </div>
   ${error ? '<div class="error">Contraseña incorrecta. Intentá de nuevo.</div>' : ''}
@@ -385,7 +385,7 @@ app.get('/fs2026pedidos', async (req, res) => {
                 ${r.entregado ? '✓ Entregado' : 'Entregar'}
               </button>
             </td>
-            <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR')}</td>
+            <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza'})}</td>
           </tr>`).join('')}
         </tbody>
       </table>

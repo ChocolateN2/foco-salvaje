@@ -182,63 +182,76 @@ app.post('/crear-preferencia', async (req, res) => {
   }
 });
 
-// Webhook MP — soporta formato nuevo y viejo de MP
+// Función para actualizar pedido por payment_id
+async function actualizarPedidoPorPago(paymentId) {
+  try {
+    const payment = new Payment(client);
+    const paymentInfo = await payment.get({ id: Number(paymentId) });
+    console.log('Payment status:', paymentInfo.status, '| email:', paymentInfo.payer?.email);
+
+    let estado = 'pendiente';
+    if (paymentInfo.status === 'approved') estado = 'exitoso';
+    if (paymentInfo.status === 'rejected') estado = 'fallido';
+
+    const conn = await mysql.createConnection(dbConfig);
+
+    // 1. Buscar por preference_id
+    if (paymentInfo.preference_id) {
+      const [r1] = await conn.execute(
+        'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
+        [estado, String(paymentId), paymentInfo.preference_id]
+      );
+      if (r1.affectedRows > 0) {
+        console.log('Actualizado por preference_id:', r1.affectedRows, 'filas');
+        await conn.end();
+        return { estado, payerEmail: paymentInfo.payer?.email };
+      }
+    }
+
+    // 2. Buscar por email del comprador
+    const payerEmail = paymentInfo.payer?.email;
+    if (payerEmail) {
+      const [r2] = await conn.execute(
+        'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1',
+        [estado, String(paymentId), payerEmail]
+      );
+      console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
+    }
+
+    await conn.end();
+    return { estado, payerEmail: paymentInfo.payer?.email };
+  } catch (err) {
+    console.error('Error actualizando pedido:', err.message);
+    return null;
+  }
+}
+
+// Webhook MP
 app.post('/webhook', async (req, res) => {
   try {
     console.log('Webhook recibido:', JSON.stringify(req.body));
-
     let paymentId = null;
-
-    // Formato nuevo: { type: 'payment', data: { id } }
     if (req.body.type === 'payment' && req.body.data?.id) {
-      paymentId = Number(req.body.data.id);
+      paymentId = req.body.data.id;
+    } else if (req.body.topic === 'payment' && req.body.resource) {
+      paymentId = req.body.resource;
     }
-    // Formato viejo IPN: { topic: 'payment', resource: '164106120854' }
-    else if (req.body.topic === 'payment' && req.body.resource) {
-      paymentId = Number(req.body.resource);
-    }
-
-    if (paymentId) {
-      const payment = new Payment(client);
-      const paymentInfo = await payment.get({ id: paymentId });
-      console.log('Payment status:', paymentInfo.status, '| email:', paymentInfo.payer?.email);
-
-      let estado = 'pendiente';
-      if (paymentInfo.status === 'approved') estado = 'exitoso';
-      if (paymentInfo.status === 'rejected') estado = 'fallido';
-
-      const conn = await mysql.createConnection(dbConfig);
-
-      // Buscar por preference_id primero
-      if (paymentInfo.preference_id) {
-        const [r1] = await conn.execute(
-          'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
-          [estado, String(paymentId), paymentInfo.preference_id]
-        );
-        console.log('Por preference_id:', r1.affectedRows, 'filas');
-        if (r1.affectedRows > 0) { await conn.end(); res.sendStatus(200); return; }
-      }
-
-      // Si no encontró, buscar por email
-      const payerEmail = paymentInfo.payer?.email;
-      if (payerEmail) {
-        const [r2] = await conn.execute(
-          'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1',
-          [estado, String(paymentId), payerEmail]
-        );
-        console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
-      } else {
-        console.log('Sin preference_id ni email');
-      }
-
-      await conn.end();
-    }
-
+    if (paymentId) await actualizarPedidoPorPago(paymentId);
     res.sendStatus(200);
   } catch (err) {
     console.error('Webhook error:', err.message);
     res.sendStatus(500);
   }
+});
+
+// Pago exitoso — doble seguro con payment_id de la URL
+app.get('/pago-exitoso', async (req, res) => {
+  const paymentId = req.query.payment_id;
+  if (paymentId) {
+    console.log('Pago exitoso redirect, payment_id:', paymentId);
+    await actualizarPedidoPorPago(paymentId);
+  }
+  res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });
 
 app.post('/fs2026entregar/:id', async (req, res) => {
@@ -577,9 +590,6 @@ async function toggleEntregar(id,btn){
 app.get('/pedidos', (req, res) => res.status(404).send('Not found'));
 app.get('/admin/login', (req, res) => res.status(404).send('Not found'));
 
-app.get('/pago-exitoso', (req, res) => {
-  res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
-});
 app.get('/pago-fallido', (req, res) => {
   res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#c0392b;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✕ Pago fallido</h1><p>Hubo un problema con el pago.<br>Por favor intentá de nuevo.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });

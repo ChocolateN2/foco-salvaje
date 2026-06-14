@@ -85,7 +85,6 @@ async function initDB() {
 
 initDB();
 
-// API fotos
 app.get('/api/fotos', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -97,7 +96,6 @@ app.get('/api/fotos', async (req, res) => {
   }
 });
 
-// Subir foto
 app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descarga'}]), async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -130,7 +128,6 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
   }
 });
 
-// Eliminar foto
 app.post('/fs2026eliminar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -143,7 +140,6 @@ app.post('/fs2026eliminar/:id', async (req, res) => {
   }
 });
 
-// Crear preferencia MP
 app.post('/crear-preferencia', async (req, res) => {
   try {
     const { items, buyer } = req.body;
@@ -186,32 +182,48 @@ app.post('/crear-preferencia', async (req, res) => {
   }
 });
 
-// Webhook MP — CORREGIDO
+// Webhook MP — busca por email del comprador
 app.post('/webhook', async (req, res) => {
   try {
-    const { type, data, action } = req.body;
+    const { type, data } = req.body;
     console.log('Webhook recibido:', JSON.stringify(req.body));
 
     if (type === 'payment' && data && data.id) {
       const payment = new Payment(client);
       const paymentInfo = await payment.get({ id: Number(data.id) });
-      console.log('Payment status:', paymentInfo.status, '| preference_id:', paymentInfo.preference_id);
+      console.log('Payment status:', paymentInfo.status);
+      console.log('Payer email:', paymentInfo.payer?.email);
+      console.log('preference_id:', paymentInfo.preference_id);
 
       let estado = 'pendiente';
       if (paymentInfo.status === 'approved') estado = 'exitoso';
       if (paymentInfo.status === 'rejected') estado = 'fallido';
 
+      const conn = await mysql.createConnection(dbConfig);
+
+      // Intentar por preference_id primero
       if (paymentInfo.preference_id) {
-        const conn = await mysql.createConnection(dbConfig);
-        const [result] = await conn.execute(
+        const [r1] = await conn.execute(
           'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
           [estado, String(data.id), paymentInfo.preference_id]
         );
-        console.log('Pedido actualizado:', result.affectedRows, 'filas | estado:', estado);
-        await conn.end();
-      } else {
-        console.log('Sin preference_id en el pago');
+        console.log('Por preference_id:', r1.affectedRows, 'filas');
+        if (r1.affectedRows > 0) { await conn.end(); res.sendStatus(200); return; }
       }
+
+      // Si no encontró, buscar por email del comprador (pedido más reciente pendiente)
+      const payerEmail = paymentInfo.payer?.email;
+      if (payerEmail) {
+        const [r2] = await conn.execute(
+          'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1',
+          [estado, String(data.id), payerEmail]
+        );
+        console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
+      } else {
+        console.log('Sin preference_id ni email del comprador');
+      }
+
+      await conn.end();
     }
     res.sendStatus(200);
   } catch (err) {
@@ -220,7 +232,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Entregar pedido
 app.post('/fs2026entregar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -233,7 +244,6 @@ app.post('/fs2026entregar/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
-// Panel admin login
 app.get('/fs2026admin', (req, res) => {
   if (req.session.admin) return res.redirect('/fs2026pedidos');
   const error = req.query.error ? true : false;
@@ -283,14 +293,12 @@ app.get('/fs2026logout', (req, res) => {
   res.redirect('/fs2026admin');
 });
 
-// Panel fotos
 app.get('/fs2026fotos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');
   try {
     const conn = await mysql.createConnection(dbConfig);
     const [fotos] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
     await conn.end();
-
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fotos — Foco Salvaje</title>
@@ -298,14 +306,14 @@ app.get('/fs2026fotos', async (req, res) => {
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',sans-serif;background:#f0f4f3;min-height:100vh}
   .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px}
-  .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .navbar-brand{color:white;font-size:17px;font-weight:700}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .nav-link{color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,0.3);padding:6px 14px;border-radius:6px}
   .nav-link:hover{background:rgba(255,255,255,0.1);color:white}
   .nav-link.active{background:rgba(255,255,255,0.15);color:white}
   .container{padding:20px;max-width:1000px;margin:0 auto}
   .upload-card{background:white;border-radius:12px;padding:24px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-  .upload-title{font-size:16px;font-weight:700;color:#04342C;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+  .upload-title{font-size:16px;font-weight:700;color:#04342C;margin-bottom:20px}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .fg{display:flex;flex-direction:column;gap:6px}
   .fg label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px}
@@ -351,55 +359,27 @@ app.get('/fs2026fotos', async (req, res) => {
     <div class="upload-title">📷 Subir nueva foto</div>
     <form id="uploadForm">
       <div class="form-grid">
-        <div class="fg">
-          <label>Nombre de la foto</label>
-          <input type="text" name="nombre" placeholder="Ej: Juan Pérez - Lanzamiento" required>
-        </div>
-        <div class="fg">
-          <label>Categoría</label>
-          <select name="categoria">
-            <option value="accion">Acción</option>
-            <option value="retrato">Retrato</option>
-            <option value="paisaje">Paisaje</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>Precio ($ ARS)</label>
-          <input type="number" name="precio" placeholder="1500" required>
-        </div>
+        <div class="fg"><label>Nombre de la foto</label><input type="text" name="nombre" placeholder="Ej: Juan Pérez - Lanzamiento" required></div>
+        <div class="fg"><label>Categoría</label><select name="categoria"><option value="accion">Acción</option><option value="retrato">Retrato</option><option value="paisaje">Paisaje</option></select></div>
+        <div class="fg"><label>Precio ($ ARS)</label><input type="number" name="precio" placeholder="1500" required></div>
       </div>
       <div class="form-grid" style="margin-top:16px">
         <div class="fg">
           <label>Foto con marca de agua (galería)</label>
-          <div class="file-input-wrap" id="wrap1">
-            <input type="file" name="foto_galeria" accept="image/*" onchange="showName(this,'name1')" required>
-            <div class="file-icon">🖼️</div>
-            <div class="file-label">Tocá para elegir la foto</div>
-            <div class="file-sublabel">Se muestra en la galería</div>
-            <div class="file-name" id="name1"></div>
-          </div>
+          <div class="file-input-wrap"><input type="file" name="foto_galeria" accept="image/*" onchange="showName(this,'name1')" required><div class="file-icon">🖼️</div><div class="file-label">Tocá para elegir la foto</div><div class="file-sublabel">Se muestra en la galería</div><div class="file-name" id="name1"></div></div>
         </div>
         <div class="fg">
           <label>Foto sin marca de agua (descarga)</label>
-          <div class="file-input-wrap" id="wrap2">
-            <input type="file" name="foto_descarga" accept="image/*" onchange="showName(this,'name2')" required>
-            <div class="file-icon">⬇️</div>
-            <div class="file-label">Tocá para elegir la foto</div>
-            <div class="file-sublabel">Se manda al comprador</div>
-            <div class="file-name" id="name2"></div>
-          </div>
+          <div class="file-input-wrap"><input type="file" name="foto_descarga" accept="image/*" onchange="showName(this,'name2')" required><div class="file-icon">⬇️</div><div class="file-label">Tocá para elegir la foto</div><div class="file-sublabel">Se manda al comprador</div><div class="file-name" id="name2"></div></div>
         </div>
       </div>
       <button class="btn-subir" type="submit" id="btnSubir">Subir foto</button>
     </form>
   </div>
-
-  <div class="upload-title" style="margin-bottom:14px;font-size:15px;color:#04342C;font-weight:700">Fotos en la galería (${fotos.length})</div>
-
+  <div class="upload-title" style="margin-bottom:14px;font-size:15px">Fotos en la galería (${fotos.length})</div>
   ${fotos.length === 0 ? '<div class="empty">No hay fotos todavía. ¡Subí la primera!</div>' : `
   <div class="fotos-grid">
-    ${fotos.map(f => `
-    <div class="foto-card" id="foto-${f.id}">
+    ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}">
       <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
       <div class="foto-info">
         <div class="foto-nombre">${f.nombre}</div>
@@ -410,68 +390,43 @@ app.get('/fs2026fotos', async (req, res) => {
     </div>`).join('')}
   </div>`}
 </div>
-
 <script>
-function showName(input, id) {
-  document.getElementById(id).textContent = input.files[0]?.name || '';
-}
-document.getElementById('uploadForm').addEventListener('submit', async e => {
+function showName(input,id){document.getElementById(id).textContent=input.files[0]?.name||'';}
+document.getElementById('uploadForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const btn = document.getElementById('btnSubir');
-  btn.disabled = true;
-  btn.textContent = 'Subiendo...';
-  const msg = document.getElementById('msg');
-  msg.className = 'msg';
-  msg.textContent = '';
-  try {
-    const formData = new FormData(e.target);
-    const res = await fetch('/fs2026subir', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (data.ok) {
-      msg.className = 'msg ok';
-      msg.textContent = '✓ Foto subida correctamente. Recargá la página para verla.';
-      e.target.reset();
-      document.getElementById('name1').textContent = '';
-      document.getElementById('name2').textContent = '';
-    } else {
-      msg.className = 'msg err';
-      msg.textContent = 'Error: ' + (data.error || 'No se pudo subir');
-    }
-  } catch(err) {
-    msg.className = 'msg err';
-    msg.textContent = 'Error de conexión. Intentá de nuevo.';
-  }
-  btn.disabled = false;
-  btn.textContent = 'Subir foto';
+  const btn=document.getElementById('btnSubir');btn.disabled=true;btn.textContent='Subiendo...';
+  const msg=document.getElementById('msg');msg.className='msg';msg.textContent='';
+  try{
+    const res=await fetch('/fs2026subir',{method:'POST',body:new FormData(e.target)});
+    const data=await res.json();
+    if(data.ok){msg.className='msg ok';msg.textContent='✓ Foto subida. Recargá la página para verla.';e.target.reset();document.getElementById('name1').textContent='';document.getElementById('name2').textContent='';}
+    else{msg.className='msg err';msg.textContent='Error: '+(data.error||'No se pudo subir');}
+  }catch(err){msg.className='msg err';msg.textContent='Error de conexión.';}
+  btn.disabled=false;btn.textContent='Subir foto';
 });
-async function eliminarFoto(id) {
-  if (!confirm('¿Eliminar esta foto?')) return;
-  const res = await fetch('/fs2026eliminar/' + id, { method: 'POST' });
-  const data = await res.json();
-  if (data.ok) document.getElementById('foto-' + id).remove();
+async function eliminarFoto(id){
+  if(!confirm('¿Eliminar esta foto?'))return;
+  const res=await fetch('/fs2026eliminar/'+id,{method:'POST'});
+  const data=await res.json();
+  if(data.ok)document.getElementById('foto-'+id).remove();
 }
 </script>
 </body></html>`);
-  } catch (err) {
-    res.status(500).send('Error');
-  }
+  } catch (err) { res.status(500).send('Error'); }
 });
 
-// Panel pedidos
 app.get('/fs2026pedidos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');
   try {
     const conn = await mysql.createConnection(dbConfig);
     const [rows] = await conn.execute('SELECT * FROM pedidos ORDER BY fecha DESC');
     await conn.end();
-
     const PER_PAGE = 20;
     const page = parseInt(req.query.page) || 1;
     const busqueda = req.query.q || '';
     const filtroEstado = req.query.estado || '';
     const filtroFecha = req.query.fecha || '';
     const filtroEntregado = req.query.entregado || '';
-
     let filtered = rows.filter(r => {
       const matchQ = !busqueda || r.nombre.toLowerCase().includes(busqueda.toLowerCase()) || r.email.toLowerCase().includes(busqueda.toLowerCase());
       const matchEstado = !filtroEstado || r.estado === filtroEstado;
@@ -479,19 +434,13 @@ app.get('/fs2026pedidos', async (req, res) => {
       const matchEntregado = filtroEntregado === '' ? true : (filtroEntregado === '1' ? r.entregado == 1 : r.entregado == 0);
       return matchQ && matchEstado && matchFecha && matchEntregado;
     });
-
     const total = filtered.length;
     const totalPages = Math.ceil(total / PER_PAGE);
     const paginated = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
     const cobrados = rows.filter(r => r.estado === 'exitoso').length;
     const entregados = rows.filter(r => r.entregado == 1).length;
     const pendientes = rows.filter(r => r.estado === 'pendiente').length;
-
-    const qStr = (extra={}) => {
-      const p = new URLSearchParams({ q: busqueda, estado: filtroEstado, fecha: filtroFecha, entregado: filtroEntregado, ...extra });
-      return p.toString();
-    };
-
+    const qStr = (extra={}) => new URLSearchParams({ q: busqueda, estado: filtroEstado, fecha: filtroFecha, entregado: filtroEntregado, ...extra }).toString();
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pedidos — Foco Salvaje</title>
@@ -499,7 +448,7 @@ app.get('/fs2026pedidos', async (req, res) => {
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',sans-serif;background:#f0f4f3;min-height:100vh}
   .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px}
-  .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .navbar-brand{color:white;font-size:17px;font-weight:700}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .nav-link{color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,0.3);padding:6px 14px;border-radius:6px}
   .nav-link:hover{background:rgba(255,255,255,0.1);color:white}
@@ -519,7 +468,6 @@ app.get('/fs2026pedidos', async (req, res) => {
   .fg input,.fg select{padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;outline:none;transition:border 0.2s;background:white}
   .fg input:focus,.fg select:focus{border-color:#1D9E75}
   .btn-filter{background:#04342C;color:white;border:none;padding:8px 20px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit}
-  .btn-filter:hover{background:#0F6E56}
   .btn-clear{color:#6b7280;border:1.5px solid #e5e7eb;background:white;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:none;display:inline-block}
   .results-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .results{font-size:13px;color:#6b7280}
@@ -527,7 +475,7 @@ app.get('/fs2026pedidos', async (req, res) => {
   .table-scroll{overflow-x:auto}
   table{width:100%;border-collapse:collapse;min-width:600px}
   thead{background:linear-gradient(135deg,#04342C,#0F6E56)}
-  th{color:white;padding:12px 16px;text-align:left;font-size:12px;font-weight:600;letter-spacing:0.5px;white-space:nowrap}
+  th{color:white;padding:12px 16px;text-align:left;font-size:12px;font-weight:600;white-space:nowrap}
   td{padding:12px 16px;border-bottom:1px solid #f3f4f6;font-size:13px;color:#374151;vertical-align:middle}
   tr:last-child td{border-bottom:none}
   tr:hover td{background:#f9fafb}
@@ -542,15 +490,8 @@ app.get('/fs2026pedidos', async (req, res) => {
   .pagination{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
   .page-btn{padding:7px 13px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:500;border:1.5px solid #e5e7eb;color:#374151;background:white;transition:all 0.2s}
   .page-btn.active{background:#04342C;color:white;border-color:#04342C}
-  .page-btn:hover:not(.active){background:#f3f4f6}
   .empty{text-align:center;padding:60px 20px;color:#9ca3af}
-  .empty-icon{font-size:48px;margin-bottom:12px}
-  @media(max-width:700px){
-    .stats{grid-template-columns:repeat(2,1fr)}
-    .container{padding:12px}
-    th,td{padding:10px 12px;font-size:12px}
-    .stat-num{font-size:20px}
-  }
+  @media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.container{padding:12px}}
 </style></head>
 <body>
 <div class="navbar">
@@ -568,59 +509,41 @@ app.get('/fs2026pedidos', async (req, res) => {
     <div class="stat s3"><div class="stat-icon">⏳</div><div class="stat-num">${pendientes}</div><div class="stat-label">Pendientes</div></div>
     <div class="stat s4"><div class="stat-icon">📤</div><div class="stat-num">${entregados}</div><div class="stat-label">Entregados</div></div>
   </div>
-
   <div class="filters">
     <div class="filters-title">🔍 Filtros</div>
     <form method="get" action="/fs2026pedidos">
       <div class="fg"><label>Buscar</label><input type="text" name="q" value="${busqueda}" placeholder="Nombre o email..."></div>
-      <div class="fg"><label>Estado</label>
-        <select name="estado">
-          <option value="">Todos</option>
-          <option value="pendiente" ${filtroEstado==='pendiente'?'selected':''}>Pendiente</option>
-          <option value="exitoso" ${filtroEstado==='exitoso'?'selected':''}>Exitoso</option>
-          <option value="fallido" ${filtroEstado==='fallido'?'selected':''}>Fallido</option>
-        </select>
-      </div>
-      <div class="fg"><label>Entregado</label>
-        <select name="entregado">
-          <option value="">Todos</option>
-          <option value="0" ${filtroEntregado==='0'?'selected':''}>No entregado</option>
-          <option value="1" ${filtroEntregado==='1'?'selected':''}>Entregado</option>
-        </select>
-      </div>
+      <div class="fg"><label>Estado</label><select name="estado"><option value="">Todos</option><option value="pendiente" ${filtroEstado==='pendiente'?'selected':''}>Pendiente</option><option value="exitoso" ${filtroEstado==='exitoso'?'selected':''}>Exitoso</option><option value="fallido" ${filtroEstado==='fallido'?'selected':''}>Fallido</option></select></div>
+      <div class="fg"><label>Entregado</label><select name="entregado"><option value="">Todos</option><option value="0" ${filtroEntregado==='0'?'selected':''}>No entregado</option><option value="1" ${filtroEntregado==='1'?'selected':''}>Entregado</option></select></div>
       <div class="fg"><label>Fecha</label><input type="date" name="fecha" value="${filtroFecha}"></div>
       <button class="btn-filter" type="submit">Filtrar</button>
       <a class="btn-clear" href="/fs2026pedidos">Limpiar</a>
     </form>
   </div>
-
   <div class="results-bar">
     <div class="results">Mostrando <strong>${paginated.length}</strong> de <strong>${total}</strong> pedidos</div>
     <div class="results">Total: <strong>$ ${filtered.reduce((s,r)=>s+parseFloat(r.total),0).toLocaleString('es-AR')}</strong></div>
   </div>
-
-  ${paginated.length === 0 ? `<div class="table-wrap"><div class="empty"><div class="empty-icon">🔍</div><div>No hay pedidos con esos filtros</div></div></div>` : `
+  ${paginated.length === 0 ? `<div class="table-wrap"><div class="empty"><div style="font-size:48px;margin-bottom:12px">🔍</div><div>No hay pedidos con esos filtros</div></div></div>` : `
   <div class="table-wrap">
     <div class="table-scroll">
       <table>
         <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th></tr></thead>
         <tbody>
-          ${paginated.map(r => `
-          <tr>
+          ${paginated.map(r => `<tr>
             <td><strong>${r.id}</strong></td>
             <td>${r.nombre}</td>
             <td>${r.email}</td>
             <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.fotos}</td>
             <td><strong>$ ${parseFloat(r.total).toLocaleString('es-AR')}</strong></td>
             <td><span class="badge ${r.estado}">${r.estado}</span></td>
-            <td><button class="btn-entregar ${r.entregado ? 'si' : 'no'}" onclick="toggleEntregar(${r.id}, this)">${r.entregado ? '✓ Entregado' : 'Entregar'}</button></td>
-            <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza', hour12:false})}</td>
+            <td><button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button></td>
+            <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})}</td>
           </tr>`).join('')}
         </tbody>
       </table>
     </div>
-    ${totalPages > 1 ? `
-    <div style="padding:16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    ${totalPages > 1 ? `<div style="padding:16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div style="font-size:13px;color:#6b7280">Página <strong>${page}</strong> de <strong>${totalPages}</strong></div>
       <div class="pagination">
         ${page > 1 ? `<a class="page-btn" href="/fs2026pedidos?${qStr({page:page-1})}">← Anterior</a>` : ''}
@@ -631,17 +554,15 @@ app.get('/fs2026pedidos', async (req, res) => {
   </div>`}
 </div>
 <script>
-  async function toggleEntregar(id, btn) {
-    const res = await fetch('/fs2026entregar/' + id, { method: 'POST' });
-    const data = await res.json();
-    if (data.entregado) { btn.textContent = '✓ Entregado'; btn.className = 'btn-entregar si'; }
-    else { btn.textContent = 'Entregar'; btn.className = 'btn-entregar no'; }
-  }
+async function toggleEntregar(id,btn){
+  const res=await fetch('/fs2026entregar/'+id,{method:'POST'});
+  const data=await res.json();
+  if(data.entregado){btn.textContent='✓ Entregado';btn.className='btn-entregar si';}
+  else{btn.textContent='Entregar';btn.className='btn-entregar no';}
+}
 </script>
 </body></html>`);
-  } catch (err) {
-    res.status(500).send('Error conectando a la base de datos');
-  }
+  } catch (err) { res.status(500).send('Error conectando a la base de datos'); }
 });
 
 app.get('/pedidos', (req, res) => res.status(404).send('Not found'));

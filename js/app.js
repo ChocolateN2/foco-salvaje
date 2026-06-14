@@ -31,15 +31,12 @@ function cam(w){return `<svg fill="none" stroke="white" stroke-width="1" viewBox
 function renderGrid(list){
   document.getElementById('galleryGrid').innerHTML=list.map(p=>`
     <div class="photo-card">
-      <div class="photo-thumb-wrap">
+      <div class="photo-thumb-wrap" onclick="openLB(${p.id})" style="cursor:pointer">
         ${p.img
           ? `<img src="${p.img}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
           : `<div class="photo-bg ${p.bg}"><div style="opacity:.15">${cam(36)}</div></div>`
         }
         <div class="photo-num-badge">#${String(p.id).padStart(3,'0')}</div>
-        <button class="photo-zoom-btn" onclick="event.stopPropagation();openLB(${p.id})">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-        </button>
       </div>
       <div class="photo-info">
         <div class="photo-name">${p.name}</div>

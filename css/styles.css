@@ -44,8 +44,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .stat-label{font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:1px;margin-top:4px}
 
 /* ── GALERÍA ── */
-#page-galeria{background:#f0ece4;flex-direction:column;padding:70px 32px 20px}
-#page-galeria.active{display:flex}
+#page-galeria{background:#f0ece4;padding:70px 32px 20px;overflow-y:auto}
+#page-galeria.active{display:block}
 .sec-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-shrink:0;flex-wrap:wrap;gap:12px}
 .sec-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--v2);margin-bottom:5px}
 .sec-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--v0);line-height:1}
@@ -54,7 +54,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .fbtn.active,.fbtn:hover{background:var(--v0);color:var(--crema);border-color:var(--v0)}
 
 /* ── GALLERY GRID — FIXED ── */
-.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;flex:1;min-height:0;overflow-y:auto}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;width:100%;overflow-y:auto;padding-bottom:20px}
 
 /* ── TARJETAS ── */
 .photo-card{background:white;border-radius:10px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:box-shadow 0.3s,transform 0.3s;box-shadow:0 2px 8px rgba(4,52,44,0.06)}

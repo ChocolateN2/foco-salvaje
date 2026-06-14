@@ -50,26 +50,48 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .sec-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--v2);margin-bottom:5px}
 .sec-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--v0);line-height:1}
 .filter-bar{display:flex;gap:6px;flex-wrap:wrap}
-.fbtn{padding:6px 14px;font-size:12px;border:1px solid rgba(4,52,44,0.15);background:transparent;color:var(--txt2);border-radius:2px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+.fbtn{padding:6px 14px;font-size:12px;border:1px solid rgba(4,52,44,0.15);background:transparent;color:var(--txt2);border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
 .fbtn.active,.fbtn:hover{background:var(--v0);color:var(--crema);border-color:var(--v0)}
-.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;flex:1;min-height:0;overflow-y:auto}
-.photo-card{background:white;border:1px solid rgba(4,52,44,0.08);border-radius:8px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:box-shadow 0.2s,transform 0.2s}
-.photo-card:hover{box-shadow:0 4px 20px rgba(4,52,44,0.1);transform:translateY(-2px)}
+.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;flex:1;min-height:0;overflow-y:auto}
+
+/* ── TARJETAS REDISEÑADAS ── */
+.photo-card{background:white;border-radius:12px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:box-shadow 0.3s,transform 0.3s;box-shadow:0 2px 8px rgba(4,52,44,0.06)}
+.photo-card:hover{box-shadow:0 12px 32px rgba(4,52,44,0.15);transform:translateY(-4px)}
 .photo-thumb-wrap{position:relative;overflow:hidden;aspect-ratio:4/3}
 .photo-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:transform 0.5s ease}
-.photo-card:hover .photo-bg{transform:scale(1.04)}
+.photo-card:hover .photo-bg{transform:scale(1.06)}
+.photo-card:hover img{transform:scale(1.06)}
+.photo-thumb-wrap img{transition:transform 0.5s ease}
+
+/* Overlay al hacer hover */
+.photo-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(4,52,44,0.85) 0%,transparent 60%);opacity:0;transition:opacity 0.3s;display:flex;flex-direction:column;justify-content:flex-end;padding:14px}
+.photo-card:hover .photo-overlay{opacity:1}
+.photo-overlay-price{font-size:20px;font-weight:700;color:white;line-height:1}
+.photo-overlay-btn{margin-top:8px;background:var(--v3);color:white;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:background 0.2s;width:100%}
+.photo-overlay-btn:hover{background:#159965}
+
 .g1{background:linear-gradient(145deg,#04342C,#0F6E56)}.g2{background:linear-gradient(145deg,#0C447C,#378ADD)}.g3{background:linear-gradient(145deg,#085041,#5DCAA5)}.g4{background:linear-gradient(145deg,#185FA5,#9FE1CB)}.g5{background:linear-gradient(145deg,#04342C,#185FA5 50%,#1D9E75)}.g6{background:linear-gradient(145deg,#0F6E56,#378ADD)}.g7{background:linear-gradient(145deg,#042C53,#1D9E75)}.g8{background:linear-gradient(145deg,#085041,#0C447C)}
-.photo-zoom-btn{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.88);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;color:var(--v0)}
-.photo-card:hover .photo-zoom-btn{opacity:1}
-.photo-zoom-btn svg{width:12px;height:12px}
-.photo-num-badge{position:absolute;top:8px;left:8px;background:rgba(4,52,44,0.55);color:white;font-size:9px;letter-spacing:1.5px;padding:3px 7px;border-radius:2px}
-.photo-info{padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
-.photo-name{font-size:13px;font-weight:500;color:var(--txt);line-height:1.3}
-.photo-cat{font-size:11px;color:var(--txt3);text-transform:capitalize}
-.photo-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:4px}
-.photo-price-tag{font-size:16px;font-weight:500;color:var(--v0)}
-.add-cart-btn{background:var(--v3);color:white;border:none;padding:6px 12px;border-radius:4px;font-size:11px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:background 0.2s;white-space:nowrap}
-.add-cart-btn:hover{background:#159965}
+
+.photo-zoom-btn{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.9);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s,transform 0.2s;color:var(--v0);backdrop-filter:blur(4px)}
+.photo-card:hover .photo-zoom-btn{opacity:1;transform:scale(1)}
+.photo-zoom-btn:hover{background:white;transform:scale(1.1) !important}
+.photo-zoom-btn svg{width:13px;height:13px}
+
+.photo-num-badge{position:absolute;top:10px;left:10px;background:rgba(4,52,44,0.7);color:white;font-size:9px;letter-spacing:1.5px;padding:3px 8px;border-radius:20px;backdrop-filter:blur(4px)}
+
+.photo-info{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.photo-name{font-size:13px;font-weight:600;color:var(--txt);line-height:1.3}
+.photo-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.photo-price-tag{font-size:15px;font-weight:700;color:var(--v0)}
+
+/* Badge de categoría */
+.photo-cat-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;text-transform:capitalize}
+.photo-cat-badge.accion{background:rgba(220,39,39,0.08);color:#dc2626}
+.photo-cat-badge.retrato{background:rgba(99,102,241,0.08);color:#6366f1}
+.photo-cat-badge.paisaje{background:rgba(29,158,117,0.1);color:var(--v2)}
+
+.add-cart-btn{background:var(--v0);color:white;border:none;padding:6px 14px;border-radius:6px;font-size:11px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;transition:background 0.2s,transform 0.15s;white-space:nowrap}
+.add-cart-btn:hover{background:var(--v2);transform:translateY(-1px)}
 
 /* ── CONTACTO ── */
 #page-contacto{background:var(--crema);display:none;align-items:center;overflow-y:auto}
@@ -130,7 +152,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .lb-nav:hover{background:rgba(255,255,255,0.15)}
 .lb-prev{left:-52px}.lb-next{right:-52px}
 
-/* ── CART NUEVO ── */
+/* ── CART ── */
 .cart-modal{position:fixed;inset:0;z-index:200;background:rgba(4,30,24,0.5);backdrop-filter:blur(6px);display:none;justify-content:flex-end}
 .cart-modal.open{display:flex}
 .cart-panel{background:white;width:420px;height:100%;display:flex;flex-direction:column;animation:slideIn 0.3s cubic-bezier(0.25,0.46,0.45,0.94);overflow:hidden;box-shadow:-8px 0 40px rgba(4,52,44,0.12)}

@@ -12,10 +12,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "mercadopago": "^3.1.0",
+    "multer": "^2.1.1",
     "mysql2": "^3.22.5"
   }
 }

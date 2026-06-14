@@ -146,6 +146,7 @@ app.get('/fs2026admin', (req, res) => {
   body{font-family:'Segoe UI',sans-serif;min-height:100vh;background:linear-gradient(135deg,#04342C 0%,#0F6E56 50%,#1D9E75 100%);display:flex;align-items:center;justify-content:center;padding:16px}
   .card{background:white;border-radius:16px;padding:40px 36px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.25)}
   .logo{text-align:center;margin-bottom:28px}
+  .logo-icon{width:56px;height:56px;background:linear-gradient(135deg,#04342C,#1D9E75);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:26px}
   .logo h1{font-size:20px;color:#04342C;font-weight:700}
   .logo p{font-size:13px;color:#9C9C94;margin-top:3px}
   .error{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;text-align:center}
@@ -158,8 +159,8 @@ app.get('/fs2026admin', (req, res) => {
 </style></head>
 <body><div class="card">
   <div class="logo">
-    <img src="/assets/logo.jpg" style="width:120px;height:120px;object-fit:contain;margin-bottom:12px">
-    <h1>FocoSalvaje</h1>
+    <div class="logo-icon">🎣</div>
+    <h1>Foco Salvaje</h1>
     <p>Panel de administración</p>
   </div>
   ${error ? '<div class="error">Contraseña incorrecta. Intentá de nuevo.</div>' : ''}

@@ -313,7 +313,7 @@ app.get('/fs2026admin', (req, res) => {
 });
 
 app.post('/fs2026admin', (req, res) => {
-  if (req.body.pass === 'Cuncarop12') {
+  if (req.body.pass === 'Nicotina48') {
     req.session.admin = true;
     res.redirect('/fs2026pedidos');
   } else {

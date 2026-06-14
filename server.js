@@ -254,6 +254,17 @@ app.get('/pago-exitoso', async (req, res) => {
   res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });
 
+// Eliminar pedido
+app.post('/fs2026eliminar-pedido/:id', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    await conn.execute('DELETE FROM pedidos WHERE id = ?', [req.params.id]);
+    await conn.end();
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: 'Error' }); }
+});
+
 app.post('/fs2026entregar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -550,9 +561,9 @@ app.get('/fs2026pedidos', async (req, res) => {
   <div class="table-wrap">
     <div class="table-scroll">
       <table>
-        <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th></tr></thead>
+        <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th><th></th></tr></thead>
         <tbody>
-          ${paginated.map(r => `<tr>
+          ${paginated.map(r => `<tr id="pedido-${r.id}">
             <td><strong>${r.id}</strong></td>
             <td>${r.nombre}</td>
             <td>${r.email}</td>
@@ -561,6 +572,7 @@ app.get('/fs2026pedidos', async (req, res) => {
             <td><span class="badge ${r.estado}">${r.estado}</span></td>
             <td><button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button></td>
             <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})}</td>
+            <td><button onclick="eliminarPedido(${r.id})" style="border:none;background:#fee2e2;color:#991b1b;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🗑</button></td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -576,6 +588,12 @@ app.get('/fs2026pedidos', async (req, res) => {
   </div>`}
 </div>
 <script>
+async function eliminarPedido(id){
+  if(!confirm('¿Eliminar este pedido?'))return;
+  const res=await fetch('/fs2026eliminar-pedido/'+id,{method:'POST'});
+  const data=await res.json();
+  if(data.ok)document.getElementById('pedido-'+id).remove();
+}
 async function toggleEntregar(id,btn){
   const res=await fetch('/fs2026entregar/'+id,{method:'POST'});
   const data=await res.json();

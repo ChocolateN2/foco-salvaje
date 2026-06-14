@@ -182,18 +182,26 @@ app.post('/crear-preferencia', async (req, res) => {
   }
 });
 
-// Webhook MP — busca por email del comprador
+// Webhook MP — soporta formato nuevo y viejo de MP
 app.post('/webhook', async (req, res) => {
   try {
-    const { type, data } = req.body;
     console.log('Webhook recibido:', JSON.stringify(req.body));
 
-    if (type === 'payment' && data && data.id) {
+    let paymentId = null;
+
+    // Formato nuevo: { type: 'payment', data: { id } }
+    if (req.body.type === 'payment' && req.body.data?.id) {
+      paymentId = Number(req.body.data.id);
+    }
+    // Formato viejo IPN: { topic: 'payment', resource: '164106120854' }
+    else if (req.body.topic === 'payment' && req.body.resource) {
+      paymentId = Number(req.body.resource);
+    }
+
+    if (paymentId) {
       const payment = new Payment(client);
-      const paymentInfo = await payment.get({ id: Number(data.id) });
-      console.log('Payment status:', paymentInfo.status);
-      console.log('Payer email:', paymentInfo.payer?.email);
-      console.log('preference_id:', paymentInfo.preference_id);
+      const paymentInfo = await payment.get({ id: paymentId });
+      console.log('Payment status:', paymentInfo.status, '| email:', paymentInfo.payer?.email);
 
       let estado = 'pendiente';
       if (paymentInfo.status === 'approved') estado = 'exitoso';
@@ -201,30 +209,31 @@ app.post('/webhook', async (req, res) => {
 
       const conn = await mysql.createConnection(dbConfig);
 
-      // Intentar por preference_id primero
+      // Buscar por preference_id primero
       if (paymentInfo.preference_id) {
         const [r1] = await conn.execute(
           'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
-          [estado, String(data.id), paymentInfo.preference_id]
+          [estado, String(paymentId), paymentInfo.preference_id]
         );
         console.log('Por preference_id:', r1.affectedRows, 'filas');
         if (r1.affectedRows > 0) { await conn.end(); res.sendStatus(200); return; }
       }
 
-      // Si no encontró, buscar por email del comprador (pedido más reciente pendiente)
+      // Si no encontró, buscar por email
       const payerEmail = paymentInfo.payer?.email;
       if (payerEmail) {
         const [r2] = await conn.execute(
           'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1',
-          [estado, String(data.id), payerEmail]
+          [estado, String(paymentId), payerEmail]
         );
         console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
       } else {
-        console.log('Sin preference_id ni email del comprador');
+        console.log('Sin preference_id ni email');
       }
 
       await conn.end();
     }
+
     res.sendStatus(200);
   } catch (err) {
     console.error('Webhook error:', err.message);

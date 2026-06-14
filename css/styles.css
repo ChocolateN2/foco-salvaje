@@ -25,7 +25,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .page.active{display:block}
 
 /* ── INICIO ── */
-#page-inicio{background:linear-gradient(135deg,rgba(4,52,44,0.85) 0%,rgba(4,52,44,0.6) 100%),url('../assets/hero.jpg') center/cover no-repeat;display:none;align-items:center}
+#page-inicio{background:url('../assets/hero.jpg') center/cover no-repeat;
 #page-inicio.active{display:flex}
 #page-inicio::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 70% at 80% 30%,rgba(29,158,117,0.14) 0%,transparent 65%),radial-gradient(ellipse 40% 50% at 10% 80%,rgba(55,138,221,0.09) 0%,transparent 55%);pointer-events:none}
 .hero-inner{display:grid;grid-template-columns:1fr 1fr;align-items:center;width:100%;padding:80px 48px 48px;gap:40px;position:relative;z-index:1}

@@ -85,7 +85,7 @@ async function initDB() {
 
 initDB();
 
-// API para obtener fotos de la galería
+// API fotos
 app.get('/api/fotos', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -97,7 +97,7 @@ app.get('/api/fotos', async (req, res) => {
   }
 });
 
-// Subir foto a Cloudinary
+// Subir foto
 app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descarga'}]), async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -105,30 +105,24 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
     if (!nombre || !categoria || !precio || !req.files?.foto_galeria || !req.files?.foto_descarga) {
       return res.status(400).json({ error: 'Faltan datos' });
     }
-
-    // Subir foto con marca de agua (galería)
     const galResult = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         { folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}` },
         (err, result) => err ? reject(err) : resolve(result)
       ).end(req.files.foto_galeria[0].buffer);
     });
-
-    // Subir foto sin marca de agua (descarga)
     const descResult = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         { folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}` },
         (err, result) => err ? reject(err) : resolve(result)
       ).end(req.files.foto_descarga[0].buffer);
     });
-
     const conn = await mysql.createConnection(dbConfig);
     await conn.execute(
       'INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga) VALUES (?, ?, ?, ?, ?)',
       [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url]
     );
     await conn.end();
-
     res.json({ ok: true });
   } catch (err) {
     console.error('Error subiendo foto:', err);
@@ -149,6 +143,7 @@ app.post('/fs2026eliminar/:id', async (req, res) => {
   }
 });
 
+// Crear preferencia MP
 app.post('/crear-preferencia', async (req, res) => {
   try {
     const { items, buyer } = req.body;
@@ -191,25 +186,41 @@ app.post('/crear-preferencia', async (req, res) => {
   }
 });
 
+// Webhook MP — CORREGIDO
 app.post('/webhook', async (req, res) => {
   try {
-    const { type, data } = req.body;
+    const { type, data, action } = req.body;
+    console.log('Webhook recibido:', JSON.stringify(req.body));
+
     if (type === 'payment' && data && data.id) {
       const payment = new Payment(client);
-      const paymentInfo = await payment.get({ id: data.id });
+      const paymentInfo = await payment.get({ id: Number(data.id) });
+      console.log('Payment status:', paymentInfo.status, '| preference_id:', paymentInfo.preference_id);
+
       let estado = 'pendiente';
       if (paymentInfo.status === 'approved') estado = 'exitoso';
       if (paymentInfo.status === 'rejected') estado = 'fallido';
+
       if (paymentInfo.preference_id) {
         const conn = await mysql.createConnection(dbConfig);
-        await conn.execute('UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?', [estado, String(data.id), paymentInfo.preference_id]);
+        const [result] = await conn.execute(
+          'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
+          [estado, String(data.id), paymentInfo.preference_id]
+        );
+        console.log('Pedido actualizado:', result.affectedRows, 'filas | estado:', estado);
         await conn.end();
+      } else {
+        console.log('Sin preference_id en el pago');
       }
     }
     res.sendStatus(200);
-  } catch (err) { res.sendStatus(500); }
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    res.sendStatus(500);
+  }
 });
 
+// Entregar pedido
 app.post('/fs2026entregar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -222,6 +233,7 @@ app.post('/fs2026entregar/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
+// Panel admin login
 app.get('/fs2026admin', (req, res) => {
   if (req.session.admin) return res.redirect('/fs2026pedidos');
   const error = req.query.error ? true : false;
@@ -258,7 +270,7 @@ app.get('/fs2026admin', (req, res) => {
 });
 
 app.post('/fs2026admin', (req, res) => {
-  if (req.body.pass === 'Cunrop12') {
+  if (req.body.pass === 'Cuncarop12') {
     req.session.admin = true;
     res.redirect('/fs2026pedidos');
   } else {
@@ -271,7 +283,7 @@ app.get('/fs2026logout', (req, res) => {
   res.redirect('/fs2026admin');
 });
 
-// Panel subir fotos
+// Panel fotos
 app.get('/fs2026fotos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');
   try {
@@ -403,7 +415,6 @@ app.get('/fs2026fotos', async (req, res) => {
 function showName(input, id) {
   document.getElementById(id).textContent = input.files[0]?.name || '';
 }
-
 document.getElementById('uploadForm').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = document.getElementById('btnSubir');
@@ -412,7 +423,6 @@ document.getElementById('uploadForm').addEventListener('submit', async e => {
   const msg = document.getElementById('msg');
   msg.className = 'msg';
   msg.textContent = '';
-
   try {
     const formData = new FormData(e.target);
     const res = await fetch('/fs2026subir', { method: 'POST', body: formData });
@@ -434,7 +444,6 @@ document.getElementById('uploadForm').addEventListener('submit', async e => {
   btn.disabled = false;
   btn.textContent = 'Subir foto';
 });
-
 async function eliminarFoto(id) {
   if (!confirm('¿Eliminar esta foto?')) return;
   const res = await fetch('/fs2026eliminar/' + id, { method: 'POST' });
@@ -448,6 +457,7 @@ async function eliminarFoto(id) {
   }
 });
 
+// Panel pedidos
 app.get('/fs2026pedidos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');
   try {
@@ -473,7 +483,6 @@ app.get('/fs2026pedidos', async (req, res) => {
     const total = filtered.length;
     const totalPages = Math.ceil(total / PER_PAGE);
     const paginated = filtered.slice((page-1)*PER_PAGE, page*PER_PAGE);
-    const totalVendido = rows.reduce((s, r) => s + parseFloat(r.total), 0);
     const cobrados = rows.filter(r => r.estado === 'exitoso').length;
     const entregados = rows.filter(r => r.entregado == 1).length;
     const pendientes = rows.filter(r => r.estado === 'pendiente').length;

@@ -14,28 +14,40 @@ goTo('inicio');
 
 function toggleMobileNav(){document.getElementById('navMobile').classList.toggle('open');}
 
-const photos=[
-  {id:1,name:'Juan Pérez - Lanzamiento',cat:'accion',price:1,img:'assets/pez1.jpg'},
-  {id:2,name:'Captura del día',cat:'accion',price:1500,img:'assets/foto22.jpg'},
-  {id:3,name:'Orilla al amanecer',cat:'paisaje',price:1500,bg:'g3'},
-  {id:4,name:'El campeón',cat:'retrato',price:1500,bg:'g4'},
-  {id:5,name:'Aguas tranquilas',cat:'paisaje',price:1500,bg:'g5'},
-  {id:6,name:'Tarde de pesca',cat:'retrato',price:1500,bg:'g6'},
-  {id:7,name:'La pieza mayor',cat:'accion',price:1500,bg:'g7'},
-  {id:8,name:'Entre nieblas',cat:'paisaje',price:1500,bg:'g8'},
-];
-let lbList=[...photos],lbCurrent=0,cart=[];
+let photos=[];
+let lbList=[],lbCurrent=0,cart=[];
 
 function cam(w){return `<svg fill="none" stroke="white" stroke-width="1" viewBox="0 0 24 24" width="${w}" height="${w}"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>`;}
 
+async function loadPhotos(){
+  try {
+    const res = await fetch('/api/fotos');
+    const data = await res.json();
+    photos = data.map(f => ({
+      id: f.id,
+      name: f.nombre,
+      cat: f.categoria,
+      price: parseFloat(f.precio),
+      img: f.url_galeria,
+      url_descarga: f.url_descarga,
+    }));
+    lbList = [...photos];
+    renderGrid(photos);
+  } catch(e) {
+    document.getElementById('galleryGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#9C9C94">No se pudieron cargar las fotos</div>';
+  }
+}
+loadPhotos();
+
 function renderGrid(list){
+  if(list.length === 0) {
+    document.getElementById('galleryGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#9C9C94">No hay fotos disponibles todavía</div>';
+    return;
+  }
   document.getElementById('galleryGrid').innerHTML=list.map(p=>`
     <div class="photo-card">
       <div class="photo-thumb-wrap" onclick="openLB(${p.id})" style="cursor:pointer">
-        ${p.img
-          ? `<img src="${p.img}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
-          : `<div class="photo-bg ${p.bg}"><div style="opacity:.15">${cam(36)}</div></div>`
-        }
+        <img src="${p.img}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         <div class="photo-num-badge">#${String(p.id).padStart(3,'0')}</div>
       </div>
       <div class="photo-info">
@@ -50,7 +62,6 @@ function renderGrid(list){
       </div>
     </div>`).join('');
 }
-renderGrid(photos);
 
 function filterPhotos(cat,btn){
   document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
@@ -64,10 +75,8 @@ function closeLB(){document.getElementById('lightbox').classList.remove('open');
 function navLB(dir){lbCurrent=(lbCurrent+dir+lbList.length)%lbList.length;updateLB();}
 function updateLB(){
   const p=lbList[lbCurrent];
-  document.getElementById('lbImg').className='lb-img '+(p.bg||'');
-  document.getElementById('lbImg').innerHTML=p.img
-    ? `<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">`
-    : `<div style="opacity:.15">${cam(80)}</div>`;
+  document.getElementById('lbImg').className='lb-img';
+  document.getElementById('lbImg').innerHTML=`<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">`;
   document.getElementById('lbNum').textContent='#'+String(p.id).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
   document.getElementById('lbName').textContent=p.name;
   document.getElementById('lbCat').textContent=p.cat.charAt(0).toUpperCase()+p.cat.slice(1);
@@ -82,13 +91,8 @@ document.addEventListener('keydown',e=>{
 function addPhoto(id){
   const p=photos.find(x=>x.id===id);if(!p)return;
   if(cart.find(i=>i.id==='photo_'+id)){showToast('Ya está en el carrito');return;}
-  cart.push({id:'photo_'+id,name:p.name,price:p.price,bg:p.bg||'g1',img:p.img||null});
+  cart.push({id:'photo_'+id,name:p.name,price:p.price,img:p.img,url_descarga:p.url_descarga});
   updateCartUI();showToast('"'+p.name+'" agregada');
-}
-function addPack(name,price){
-  const pid='pack_'+name;
-  if(cart.find(i=>i.id===pid)){showToast('Ya está en el carrito');return;}
-  cart.push({id:pid,name,price,bg:'g1'});updateCartUI();showToast(name+' agregado');
 }
 function removeItem(id){cart=cart.filter(i=>i.id!==id);updateCartUI();}
 
@@ -119,7 +123,7 @@ function updateCartUI(){
     foot.style.display='block';
     body.innerHTML=cart.map(item=>`
       <div class="cart-item">
-        <div class="ci-thumb ${item.bg||'g1'}" style="overflow:hidden;border-radius:6px">
+        <div class="ci-thumb" style="overflow:hidden;border-radius:6px;background:#e5e7eb">
           ${item.img?`<img src="${item.img}" style="width:100%;height:100%;object-fit:cover;">`:cam(20)}
         </div>
         <div class="ci-info">

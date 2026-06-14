@@ -385,7 +385,7 @@ app.get('/fs2026pedidos', async (req, res) => {
                 ${r.entregado ? '✓ Entregado' : 'Entregar'}
               </button>
             </td>
-            <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza'})}</td>
+            <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza', hour12:false})}</td>
           </tr>`).join('')}
         </tbody>
       </table>

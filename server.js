@@ -159,7 +159,7 @@ app.get('/fs2026admin', (req, res) => {
 <body><div class="card">
   <div class="logo">
     <img src="/assets/logo.jpg" style="width:120px;height:120px;object-fit:contain;margin-bottom:12px">
-    <h1>Foco Salvaje</h1>
+    <h1>FocoSalvaje</h1>
     <p>Panel de administración</p>
   </div>
   ${error ? '<div class="error">Contraseña incorrecta. Intentá de nuevo.</div>' : ''}

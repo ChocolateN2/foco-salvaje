@@ -379,7 +379,7 @@ app.get('/fs2026fotos', async (req, res) => {
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand">🎣 Foco Salvaje</div>
+  <div class="navbar-brand">📸 Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link active" href="/fs2026fotos">📷 Fotos</a>
     <a class="nav-link" href="/fs2026pedidos">📋 Pedidos</a>

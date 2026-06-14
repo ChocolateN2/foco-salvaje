@@ -313,7 +313,7 @@ app.get('/fs2026admin', (req, res) => {
 });
 
 app.post('/fs2026admin', (req, res) => {
-  if (req.body.pass === 'Nicotina48') {
+  if (req.body.pass === 'Cuncarop12') {
     req.session.admin = true;
     res.redirect('/fs2026pedidos');
   } else {
@@ -379,7 +379,7 @@ app.get('/fs2026fotos', async (req, res) => {
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand">📸 Foco Salvaje</div>
+  <div class="navbar-brand">🎣 Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link active" href="/fs2026fotos">📷 Fotos</a>
     <a class="nav-link" href="/fs2026pedidos">📋 Pedidos</a>
@@ -393,7 +393,7 @@ app.get('/fs2026fotos', async (req, res) => {
     <form id="uploadForm">
       <div class="form-grid">
         <div class="fg"><label>Nombre de la foto</label><input type="text" name="nombre" placeholder="Ej: Juan Pérez - Lanzamiento" required></div>
-        <div class="fg"><label>Categoría</label><select name="categoria"><option value="accion">Acción</option><option value="retrato">Retrato</option><option value="paisaje">Paisaje</option></select></div>
+        <div class="fg"><label>Categoría</label><select name="categoria"><option value="accion">Acción</option><option value="retrato">Retrato</option><option value="paisaje">Paisaje & Naturaleza</option><option value="campeonato">Campeonato de Pesca</option></select></div>
         <div class="fg"><label>Precio ($ ARS)</label><input type="number" name="precio" placeholder="1500" required></div>
       </div>
       <div class="form-grid" style="margin-top:16px">

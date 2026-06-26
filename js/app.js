@@ -19,6 +19,25 @@ let lbList=[],lbCurrent=0,cart=[];
 
 function cam(w){return `<svg fill="none" stroke="white" stroke-width="1" viewBox="0 0 24 24" width="${w}" height="${w}"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>`;}
 
+const CAT_LABELS = {
+  accion: 'Acción',
+  retrato: 'Retrato',
+  paisaje: 'Paisaje & Naturaleza',
+  campeonato: 'Campeonato de Pesca'
+};
+
+function catLabel(cat){
+  return CAT_LABELS[cat] || (cat.charAt(0).toUpperCase()+cat.slice(1));
+}
+
+function renderFilters(){
+  const cats = [...new Set(photos.map(p=>p.cat))]
+    .sort((a,b)=>catLabel(a).localeCompare(catLabel(b),'es'));
+  const bar = document.querySelector('.filter-bar');
+  bar.innerHTML = `<button class="fbtn active" onclick="filterPhotos('todas',this)">Todas</button>`
+    + cats.map(c=>`<button class="fbtn" onclick="filterPhotos('${c}',this)">${catLabel(c)}</button>`).join('');
+}
+
 async function loadPhotos(){
   try {
     const res = await fetch('/api/fotos');
@@ -32,6 +51,7 @@ async function loadPhotos(){
       url_descarga: f.url_descarga,
     }));
     lbList = [...photos];
+    renderFilters();
     renderGrid(photos);
   } catch(e) {
     document.getElementById('galleryGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#9C9C94">No se pudieron cargar las fotos</div>';
@@ -54,7 +74,7 @@ function renderGrid(list){
         <div class="photo-name">${p.name}</div>
         <div class="photo-bottom">
           <div>
-            <span class="photo-cat-badge ${p.cat}">${p.cat}</span>
+            <span class="photo-cat-badge ${p.cat}">${catLabel(p.cat)}</span>
             <div class="photo-price-tag">$ ${p.price.toLocaleString('es-AR')}</div>
           </div>
           <button class="add-cart-btn" onclick="addPhoto(${p.id})">+ Agregar</button>
@@ -79,7 +99,7 @@ function updateLB(){
   document.getElementById('lbImg').innerHTML=`<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">`;
   document.getElementById('lbNum').textContent='#'+String(p.id).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
   document.getElementById('lbName').textContent=p.name;
-  document.getElementById('lbCat').textContent=p.cat.charAt(0).toUpperCase()+p.cat.slice(1);
+  document.getElementById('lbCat').textContent=catLabel(p.cat);
   document.getElementById('lbPrice').textContent='$ '+p.price.toLocaleString('es-AR');
   document.getElementById('lbAdd').onclick=()=>addPhoto(p.id);
 }

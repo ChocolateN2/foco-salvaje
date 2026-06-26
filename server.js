@@ -293,6 +293,21 @@ app.post('/fs2026eliminar-pedido/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
+app.post('/fs2026editar-email/:id', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) return res.status(400).json({ error: 'Email inválido' });
+    const conn = await mysql.createConnection(dbConfig);
+    await conn.execute('UPDATE pedidos SET email = ? WHERE id = ?', [email, req.params.id]);
+    await conn.end();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error editando email:', err.message);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 app.post('/fs2026reenviar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -303,8 +318,7 @@ app.post('/fs2026reenviar/:id', async (req, res) => {
     const nombresFotos = pedido.fotos.split(',').map(s => s.trim());
     const placeholders = nombresFotos.map(() => '?').join(',');
     const [fotosRows] = await conn.execute(`SELECT * FROM fotos WHERE nombre IN (${placeholders})`, nombresFotos);
-    await conn.end();
-    if (fotosRows.length === 0) return res.status(404).json({ error: 'No se encontraron las fotos de este pedido' });
+    if (fotosRows.length === 0) { await conn.end(); return res.status(404).json({ error: 'No se encontraron las fotos de este pedido' }); }
     const linksHtml = fotosRows.map(f => `<li><a href="${f.url_descarga}" target="_blank">${f.nombre}</a></li>`).join('');
     const html = `
       <h2>¡Gracias por tu compra en Foco Salvaje!</h2>
@@ -313,8 +327,14 @@ app.post('/fs2026reenviar/:id', async (req, res) => {
       <p>Cualquier consulta, escribinos a focosalvajeph@gmail.com</p>
     `;
     const enviado = await enviarEmail({ to: pedido.email, subject: '¡Tus fotos de Foco Salvaje están listas!', html });
-    if (enviado) res.json({ ok: true });
-    else res.status(500).json({ error: 'No se pudo enviar el email' });
+    if (enviado) {
+      await conn.execute('UPDATE pedidos SET estado = "exitoso" WHERE id = ?', [req.params.id]);
+      await conn.end();
+      res.json({ ok: true });
+    } else {
+      await conn.end();
+      res.status(500).json({ error: 'No se pudo enviar el email' });
+    }
   } catch (err) {
     console.error('Error reenviando fotos:', err.message);
     res.status(500).json({ error: 'Error del servidor' });
@@ -832,7 +852,12 @@ app.get('/fs2026pedidos', async (req, res) => {
           ${paginated.map(r => `<tr id="pedido-${r.id}">
             <td><strong>${r.id}</strong></td>
             <td>${r.nombre}</td>
-            <td>${r.email}</td>
+            <td><span id="email-${r.id}">${r.email}</span> <button onclick="toggleEmailEdit(${r.id})" style="border:none;background:none;cursor:pointer;font-size:11px;color:#1d5e8c;">✏️</button>
+              <div id="email-edit-${r.id}" style="display:none;margin-top:6px">
+                <input type="email" id="email-input-${r.id}" value="${r.email}" style="font-size:12px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;width:160px">
+                <button onclick="guardarEmail(${r.id})" style="border:none;background:#04342C;color:white;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">OK</button>
+              </div>
+            </td>
             <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.fotos}</td>
             <td><strong>$ ${parseFloat(r.total).toLocaleString('es-AR')}</strong></td>
             <td><span class="badge ${r.estado}">${r.estado}</span></td>
@@ -855,6 +880,26 @@ app.get('/fs2026pedidos', async (req, res) => {
   </div>`}
 </div>
 <script>
+function toggleEmailEdit(id){
+  const div=document.getElementById('email-edit-'+id);
+  div.style.display = div.style.display==='none' ? 'block' : 'none';
+}
+async function guardarEmail(id){
+  const nuevoEmail=document.getElementById('email-input-'+id).value.trim();
+  if(!nuevoEmail||!nuevoEmail.includes('@')){alert('Ingresá un email válido');return;}
+  const res=await fetch('/fs2026editar-email/'+id,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:nuevoEmail})
+  });
+  const data=await res.json();
+  if(data.ok){
+    document.getElementById('email-'+id).textContent=nuevoEmail;
+    toggleEmailEdit(id);
+  } else {
+    alert('Error: '+(data.error||'No se pudo guardar'));
+  }
+}
 async function eliminarPedido(id){
   if(!confirm('¿Eliminar este pedido?'))return;
   const res=await fetch('/fs2026eliminar-pedido/'+id,{method:'POST'});
@@ -862,10 +907,13 @@ async function eliminarPedido(id){
   if(data.ok)document.getElementById('pedido-'+id).remove();
 }
 async function reenviarFotos(id){
-  if(!confirm('¿Reenviar las fotos de este pedido por email?'))return;
+  if(!confirm('¿Reenviar las fotos de este pedido por email? El pedido se marcará como exitoso.'))return;
   const res=await fetch('/fs2026reenviar/'+id,{method:'POST'});
   const data=await res.json();
-  if(data.ok)alert('✓ Email reenviado correctamente.');
+  if(data.ok){
+    alert('✓ Email reenviado y pedido marcado como exitoso.');
+    location.reload();
+  }
   else alert('Error: '+(data.error||'No se pudo reenviar'));
 }
 async function toggleEntregar(id,btn){

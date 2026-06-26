@@ -43,7 +43,7 @@ async function loadPhotos(){
     const res = await fetch('/api/fotos');
     const data = await res.json();
     // Ordenar por fecha ascendente para numerar correlativamente sin huecos
-    const sortedByDate = [...data].sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
+    const sortedByDate = [...data].sort((a,b)=> new Date(b.fecha) - new Date(a.fecha));
     const numByOriginalId = {};
     sortedByDate.forEach((f,idx)=>{ numByOriginalId[f.id] = idx+1; });
 

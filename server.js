@@ -75,8 +75,8 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
     const { nombre, categoria, precio } = req.body;
-    if (!nombre || !categoria || !precio || !req.files?.foto_galeria || !req.files?.foto_descarga)
-      return res.status(400).json({ error: 'Faltan datos' });
+    if (!nombre || !categoria || !precio || parseFloat(precio) <= 0 || !req.files?.foto_galeria || !req.files?.foto_descarga)
+      return res.status(400).json({ error: 'Faltan datos o el precio no es válido' });
     const galResult = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream({ folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_galeria[0].buffer);
     });
@@ -98,7 +98,7 @@ app.post('/fs2026editar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
     const { nombre, categoria, precio } = req.body;
-    if (!nombre || !categoria || !precio) return res.status(400).json({ error: 'Faltan datos' });
+    if (!nombre || !categoria || !precio || parseFloat(precio) <= 0) return res.status(400).json({ error: 'Datos inválidos' });
     const conn = await mysql.createConnection(dbConfig);
     await conn.execute('UPDATE fotos SET nombre = ?, categoria = ?, precio = ? WHERE id = ?', [nombre, categoria, parseFloat(precio), req.params.id]);
     await conn.end();
@@ -267,61 +267,76 @@ app.get('/fs2026fotos', async (req, res) => {
     const conn = await mysql.createConnection(dbConfig);
     const [fotos] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
     await conn.end();
+    const CAT_LABELS = { accion: 'Acción', retrato: 'Retrato', paisaje: 'Paisaje & Naturaleza', campeonato: 'Campeonato de Pesca' };
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fotos — Foco Salvaje</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',sans-serif;background:#f0f4f3;min-height:100vh}
-  .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px}
-  .navbar-brand{color:white;font-size:17px;font-weight:700}
+  body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937}
+  .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:10}
+  .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .nav-link{color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,0.3);padding:6px 14px;border-radius:6px}
-  .nav-link:hover{background:rgba(255,255,255,0.1);color:white}
-  .nav-link.active{background:rgba(255,255,255,0.15);color:white}
-  .container{padding:20px;max-width:1000px;margin:0 auto}
-  .upload-card{background:white;border-radius:12px;padding:24px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-  .upload-title{font-size:16px;font-weight:700;color:#04342C;margin-bottom:20px}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .fg{display:flex;flex-direction:column;gap:6px}
-  .fg label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px}
-  .fg input,.fg select{padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;transition:border 0.2s}
-  .fg input:focus,.fg select:focus{border-color:#1D9E75}
-  .file-input-wrap{border:2px dashed #e5e7eb;border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border 0.2s;position:relative;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .file-input-wrap:hover{border-color:#1D9E75}
+  .nav-link{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,0.3);padding:7px 16px;border-radius:8px;transition:all 0.2s;font-weight:500}
+  .nav-link:hover{background:rgba(255,255,255,0.12);color:white}
+  .nav-link.active{background:rgba(255,255,255,0.18);color:white;border-color:rgba(255,255,255,0.45)}
+  .container{padding:24px 20px 60px;max-width:1100px;margin:0 auto}
+  .upload-card{background:white;border-radius:16px;padding:28px;margin-bottom:28px;box-shadow:0 4px 16px rgba(4,52,44,0.07);border:1px solid #e8ece9}
+  .upload-title{font-size:18px;font-weight:700;color:#04342C;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .form-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+  .fg{display:flex;flex-direction:column;gap:7px}
+  .fg label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px}
+  .fg input,.fg select{padding:11px 13px;border:1.5px solid #e2e5e9;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:border 0.2s,box-shadow 0.2s;background:#fbfcfc}
+  .fg input:focus,.fg select:focus{border-color:#1D9E75;box-shadow:0 0 0 3px rgba(29,158,117,0.12);background:white}
+  .file-input-wrap{border:2px dashed #d9dee0;border-radius:12px;padding:18px;text-align:center;cursor:pointer;transition:border 0.2s,background 0.2s;position:relative;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fafbfb}
+  .file-input-wrap:hover{border-color:#1D9E75;background:#f3fbf8}
+  .file-input-wrap.has-preview{border-style:solid;border-color:#1D9E75;background:white}
   .file-input-wrap input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2}
-  .file-preview-img{max-width:100%;max-height:120px;border-radius:6px;margin-bottom:8px;display:none;object-fit:cover}
-  .file-icon{font-size:28px;margin-bottom:8px}
-  .file-label{font-size:13px;color:#6b7280}
-  .file-sublabel{font-size:11px;color:#9ca3af;margin-top:4px}
-  .file-name{font-size:12px;color:#04342C;font-weight:500;margin-top:8px}
-  .btn-subir{background:linear-gradient(135deg,#04342C,#1D9E75);color:white;border:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:20px;font-family:inherit;width:100%}
-  .btn-subir:hover{opacity:0.9}
-  .btn-subir:disabled{background:#9ca3af;cursor:not-allowed}
-  .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .foto-card{background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-  .foto-img{width:100%;aspect-ratio:4/3;object-fit:cover}
-  .foto-info{padding:12px}
-  .foto-nombre{font-size:13px;font-weight:600;color:#111827}
-  .foto-cat{font-size:11px;color:#6b7280;margin-top:2px;text-transform:capitalize}
-  .foto-precio{font-size:14px;font-weight:700;color:#04342C;margin-top:6px}
-  .btn-row{display:flex;gap:6px;margin-top:8px}
-  .btn-editar{flex:1;background:#e0f2fe;color:#075985;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-  .btn-editar:hover{background:#bae6fd}
-  .btn-eliminar{flex:1;background:#fee2e2;color:#991b1b;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-  .btn-eliminar:hover{background:#fecaca}
-  .empty{text-align:center;padding:48px;color:#9ca3af;background:white;border-radius:12px}
-  .msg{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
-  .msg.ok{background:#d1fae5;color:#065f46;display:block}
-  .msg.err{background:#fee2e2;color:#991b1b;display:block}
-  .edit-form{display:none;padding:12px;background:#f8fafc;border-top:1px solid #e5e7eb}
-  .edit-form.open{display:block}
-  .edit-form .fg{margin-bottom:8px}
-  .edit-form input,.edit-form select{padding:7px 9px;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;width:100%;font-family:inherit}
-  .edit-actions{display:flex;gap:6px;margin-top:8px}
-  .btn-guardar{flex:1;background:#04342C;color:white;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-  .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-  @media(max-width:600px){.form-grid{grid-template-columns:1fr}.fotos-grid{grid-template-columns:repeat(2,1fr)}}
+  .file-preview-img{max-width:100%;max-height:130px;border-radius:8px;margin-bottom:10px;display:none;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.12)}
+  .file-icon{font-size:26px;margin-bottom:8px}
+  .file-label{font-size:13px;color:#4b5563;font-weight:500}
+  .file-sublabel{font-size:11px;color:#9ca3af;margin-top:3px}
+  .file-name{font-size:12px;color:#04342C;font-weight:600;margin-top:8px;word-break:break-all;max-width:100%}
+  .field-hint{font-size:11px;color:#9ca3af;margin-top:4px}
+  .btn-subir{background:linear-gradient(135deg,#04342C,#1D9E75);color:white;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:24px;font-family:inherit;width:100%;transition:opacity 0.2s,transform 0.15s;letter-spacing:0.3px}
+  .btn-subir:hover{opacity:0.92;transform:translateY(-1px)}
+  .btn-subir:disabled{background:#9ca3af;cursor:not-allowed;transform:none}
+  .gallery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .gallery-title{font-size:16px;font-weight:700;color:#04342C}
+  .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .foto-card{background:white;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(4,52,44,0.07);border:1px solid #eef1f0;transition:box-shadow 0.2s}
+  .foto-card:hover{box-shadow:0 6px 20px rgba(4,52,44,0.12)}
+  .foto-img-wrap{position:relative;aspect-ratio:4/3;overflow:hidden;background:#f1f3f2}
+  .foto-img{width:100%;height:100%;object-fit:cover;display:block}
+  .foto-id-badge{position:absolute;top:8px;left:8px;background:rgba(4,52,44,0.75);color:white;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:0.5px;backdrop-filter:blur(4px)}
+  .foto-info{padding:14px}
+  .foto-nombre{font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;line-height:1.3}
+  .foto-meta-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .foto-cat-pill{font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:#e6f4ee;color:#0d7a52}
+  .foto-precio{font-size:15px;font-weight:800;color:#04342C}
+  .btn-row{display:flex;gap:8px}
+  .btn-editar{flex:1;background:#eaf3fb;color:#1d5e8c;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.2s}
+  .btn-editar:hover{background:#d4e9f9}
+  .btn-eliminar{flex:1;background:#fdecec;color:#b3261e;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.2s}
+  .btn-eliminar:hover{background:#fbd5d5}
+  .empty{text-align:center;padding:56px 24px;color:#9ca3af;background:white;border-radius:16px;border:1px solid #eef1f0}
+  .empty-icon{font-size:40px;margin-bottom:10px}
+  .msg{padding:13px 18px;border-radius:10px;font-size:13.5px;margin-bottom:18px;display:none;font-weight:500}
+  .msg.ok{background:#e3f7ee;color:#0a6b46;display:block;border:1px solid #b9e8d2}
+  .msg.err{background:#fdecec;color:#b3261e;display:block;border:1px solid #f8c9c9}
+  .edit-form{display:none;padding:16px;background:#f8fafc;border-top:1px solid #eef1f0}
+  .edit-form.open{display:block;animation:slideDown 0.2s ease}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  .edit-form .fg{margin-bottom:10px}
+  .edit-form input,.edit-form select{padding:8px 10px;font-size:12.5px;border:1.5px solid #e2e5e9;border-radius:8px;width:100%;font-family:inherit;outline:none}
+  .edit-form input:focus,.edit-form select:focus{border-color:#1D9E75}
+  .edit-actions{display:flex;gap:8px;margin-top:10px}
+  .btn-guardar{flex:1;background:#04342C;color:white;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-guardar:hover{background:#0F6E56}
+  .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-cancelar:hover{background:#d1d5db}
+  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.fotos-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px 12px 50px}.upload-card{padding:20px}}
+  @media(max-width:420px){.fotos-grid{grid-template-columns:1fr}}
 </style></head>
 <body>
 <div class="navbar">
@@ -340,30 +355,45 @@ app.get('/fs2026fotos', async (req, res) => {
       <div class="form-grid">
         <div class="fg"><label>Nombre de la foto</label><input type="text" name="nombre" placeholder="Ej: Juan Pérez - Lanzamiento" required></div>
         <div class="fg"><label>Categoría</label><select name="categoria"><option value="accion">Acción</option><option value="retrato">Retrato</option><option value="paisaje">Paisaje & Naturaleza</option><option value="campeonato">Campeonato de Pesca</option></select></div>
-        <div class="fg"><label>Precio ($ ARS)</label><input type="number" name="precio" placeholder="1500" required></div>
       </div>
-      <div class="form-grid" style="margin-top:16px">
+      <div class="form-grid" style="margin-top:18px">
+        <div class="fg">
+          <label>Precio ($ ARS)</label>
+          <input type="number" name="precio" placeholder="1500" min="1" step="1" required>
+          <div class="field-hint">Debe ser mayor a $0</div>
+        </div>
+        <div></div>
+      </div>
+      <div class="form-grid" style="margin-top:18px">
         <div class="fg">
           <label>Foto con marca de agua (galería)</label>
-          <div class="file-input-wrap"><input type="file" name="foto_galeria" accept="image/*" onchange="showPreview(this,'name1','prev1')" required><img class="file-preview-img" id="prev1"><div class="file-icon" id="icon1">🖼️</div><div class="file-label" id="label1">Tocá para elegir la foto</div><div class="file-sublabel">Se muestra en la galería</div><div class="file-name" id="name1"></div></div>
+          <div class="file-input-wrap" id="wrap1"><input type="file" name="foto_galeria" accept="image/*" onchange="showPreview(this,'name1','prev1','wrap1')" required><img class="file-preview-img" id="prev1"><div class="file-icon" id="icon1">🖼️</div><div class="file-label" id="label1">Tocá para elegir la foto</div><div class="file-sublabel">Se muestra en la galería</div><div class="file-name" id="name1"></div></div>
         </div>
         <div class="fg">
           <label>Foto sin marca de agua (descarga)</label>
-          <div class="file-input-wrap"><input type="file" name="foto_descarga" accept="image/*" onchange="showPreview(this,'name2','prev2')" required><img class="file-preview-img" id="prev2"><div class="file-icon" id="icon2">⬇️</div><div class="file-label" id="label2">Tocá para elegir la foto</div><div class="file-sublabel">Se manda al comprador</div><div class="file-name" id="name2"></div></div>
+          <div class="file-input-wrap" id="wrap2"><input type="file" name="foto_descarga" accept="image/*" onchange="showPreview(this,'name2','prev2','wrap2')" required><img class="file-preview-img" id="prev2"><div class="file-icon" id="icon2">⬇️</div><div class="file-label" id="label2">Tocá para elegir la foto</div><div class="file-sublabel">Se manda al comprador</div><div class="file-name" id="name2"></div></div>
         </div>
       </div>
       <button class="btn-subir" type="submit" id="btnSubir">Subir foto</button>
     </form>
   </div>
-  <div class="upload-title" style="margin-bottom:14px;font-size:15px">Fotos en la galería (${fotos.length})</div>
-  ${fotos.length === 0 ? '<div class="empty">No hay fotos todavía. ¡Subí la primera!</div>' : `
+
+  <div class="gallery-header">
+    <div class="gallery-title">Fotos en la galería (${fotos.length})</div>
+  </div>
+  ${fotos.length === 0 ? '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>' : `
   <div class="fotos-grid">
     ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}">
-      <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
+      <div class="foto-img-wrap">
+        <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
+        <div class="foto-id-badge">#${String(f.id).padStart(3,'0')}</div>
+      </div>
       <div class="foto-info">
         <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
-        <div class="foto-cat" id="cat-${f.id}">${f.categoria}</div>
-        <div class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</div>
+        <div class="foto-meta-row">
+          <span class="foto-cat-pill" id="cat-${f.id}" data-cat="${f.categoria}">${CAT_LABELS[f.categoria] || f.categoria}</span>
+          <span class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</span>
+        </div>
         <div class="btn-row">
           <button class="btn-editar" onclick="toggleEdit(${f.id})">✏️ Editar</button>
           <button class="btn-eliminar" onclick="eliminarFoto(${f.id})">🗑 Eliminar</button>
@@ -379,7 +409,7 @@ app.get('/fs2026fotos', async (req, res) => {
             <option value="campeonato" ${f.categoria==='campeonato'?'selected':''}>Campeonato de Pesca</option>
           </select>
         </div>
-        <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}"></div>
+        <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}" min="1" step="1"></div>
         <div class="edit-actions">
           <button class="btn-guardar" onclick="guardarEdit(${f.id})">Guardar</button>
           <button class="btn-cancelar" onclick="toggleEdit(${f.id})">Cancelar</button>
@@ -389,53 +419,71 @@ app.get('/fs2026fotos', async (req, res) => {
   </div>`}
 </div>
 <script>
-function showPreview(input,nameId,prevId){
+const CAT_LABELS={accion:'Acción',retrato:'Retrato',paisaje:'Paisaje & Naturaleza',campeonato:'Campeonato de Pesca'};
+
+function showPreview(input,nameId,prevId,wrapId){
   const file=input.files[0];
   document.getElementById(nameId).textContent=file?.name||'';
   const img=document.getElementById(prevId);
+  const wrap=document.getElementById(wrapId);
   if(file){
     const reader=new FileReader();
     reader.onload=e=>{
       img.src=e.target.result;
       img.style.display='block';
+      wrap.classList.add('has-preview');
     };
     reader.readAsDataURL(file);
   } else {
     img.style.display='none';
+    wrap.classList.remove('has-preview');
   }
 }
+
 document.getElementById('uploadForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  const precioInput = e.target.querySelector('input[name="precio"]');
+  if (parseFloat(precioInput.value) <= 0 || !precioInput.value) {
+    const msg=document.getElementById('msg');
+    msg.className='msg err';
+    msg.textContent='El precio debe ser mayor a $0';
+    precioInput.focus();
+    return;
+  }
   const btn=document.getElementById('btnSubir');btn.disabled=true;btn.textContent='Subiendo...';
   const msg=document.getElementById('msg');msg.className='msg';msg.textContent='';
   try{
     const res=await fetch('/fs2026subir',{method:'POST',body:new FormData(e.target)});
     const data=await res.json();
     if(data.ok){
-      msg.className='msg ok';msg.textContent='✓ Foto subida. Recargá la página para verla.';
+      msg.className='msg ok';msg.textContent='✓ Foto subida correctamente. Recargá la página para verla.';
       e.target.reset();
       document.getElementById('name1').textContent='';document.getElementById('name2').textContent='';
       document.getElementById('prev1').style.display='none';document.getElementById('prev2').style.display='none';
+      document.getElementById('wrap1').classList.remove('has-preview');document.getElementById('wrap2').classList.remove('has-preview');
     }
     else{msg.className='msg err';msg.textContent='Error: '+(data.error||'No se pudo subir');}
   }catch(err){msg.className='msg err';msg.textContent='Error de conexión.';}
   btn.disabled=false;btn.textContent='Subir foto';
 });
+
 async function eliminarFoto(id){
   if(!confirm('¿Eliminar esta foto?'))return;
   const res=await fetch('/fs2026eliminar/'+id,{method:'POST'});
   const data=await res.json();
   if(data.ok)document.getElementById('foto-'+id).remove();
 }
+
 function toggleEdit(id){
   document.getElementById('edit-'+id).classList.toggle('open');
 }
-const CAT_LABELS={accion:'Acción',retrato:'Retrato',paisaje:'Paisaje & Naturaleza',campeonato:'Campeonato de Pesca'};
+
 async function guardarEdit(id){
   const nombre=document.getElementById('edit-nombre-'+id).value.trim();
   const categoria=document.getElementById('edit-cat-'+id).value;
   const precio=document.getElementById('edit-precio-'+id).value;
-  if(!nombre||!precio){alert('Completá nombre y precio');return;}
+  if(!nombre){alert('El nombre no puede estar vacío');return;}
+  if(!precio || parseFloat(precio) <= 0){alert('El precio debe ser mayor a $0');return;}
   const res=await fetch('/fs2026editar/'+id,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -444,7 +492,9 @@ async function guardarEdit(id){
   const data=await res.json();
   if(data.ok){
     document.getElementById('nombre-'+id).textContent=nombre;
-    document.getElementById('cat-'+id).textContent=categoria;
+    const catEl=document.getElementById('cat-'+id);
+    catEl.textContent=CAT_LABELS[categoria]||categoria;
+    catEl.dataset.cat=categoria;
     document.getElementById('precio-'+id).textContent='$ '+parseFloat(precio).toLocaleString('es-AR');
     toggleEdit(id);
   } else {
@@ -455,6 +505,7 @@ async function guardarEdit(id){
 </body></html>`);
   } catch (err) { res.status(500).send('Error'); }
 });
+
 
 app.get('/fs2026pedidos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');

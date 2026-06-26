@@ -42,8 +42,14 @@ async function loadPhotos(){
   try {
     const res = await fetch('/api/fotos');
     const data = await res.json();
+    // Ordenar por fecha ascendente para numerar correlativamente sin huecos
+    const sortedByDate = [...data].sort((a,b)=> new Date(a.fecha) - new Date(b.fecha));
+    const numByOriginalId = {};
+    sortedByDate.forEach((f,idx)=>{ numByOriginalId[f.id] = idx+1; });
+
     photos = data.map(f => ({
       id: f.id,
+      displayNum: numByOriginalId[f.id],
       name: f.nombre,
       cat: f.categoria,
       price: parseFloat(f.precio),
@@ -68,7 +74,7 @@ function renderGrid(list){
     <div class="photo-card">
       <div class="photo-thumb-wrap" onclick="openLB(${p.id})" style="cursor:pointer">
         <img src="${p.img}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
-        <div class="photo-num-badge">#${String(p.id).padStart(3,'0')}</div>
+        <div class="photo-num-badge">#${String(p.displayNum).padStart(3,'0')}</div>
       </div>
       <div class="photo-info">
         <div class="photo-name">${p.name}</div>
@@ -97,7 +103,7 @@ function updateLB(){
   const p=lbList[lbCurrent];
   document.getElementById('lbImg').className='lb-img';
   document.getElementById('lbImg').innerHTML=`<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">`;
-  document.getElementById('lbNum').textContent='#'+String(p.id).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
+  document.getElementById('lbNum').textContent='#'+String(p.displayNum).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
   document.getElementById('lbName').textContent=p.name;
   document.getElementById('lbCat').textContent=catLabel(p.cat);
   document.getElementById('lbPrice').textContent='$ '+p.price.toLocaleString('es-AR');

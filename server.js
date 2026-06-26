@@ -34,7 +34,7 @@ const client = new MercadoPagoConfig({
 });
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const NOTIFY_EMAIL = 'nankarsw80@gmail.com';
+const NOTIFY_EMAIL = 'chocolatete277@gmail.com';
 
 async function enviarEmail({ to, subject, html }) {
   if (!RESEND_API_KEY) {

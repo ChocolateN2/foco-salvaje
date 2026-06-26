@@ -293,6 +293,34 @@ app.post('/fs2026eliminar-pedido/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
+app.post('/fs2026reenviar/:id', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT * FROM pedidos WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) { await conn.end(); return res.status(404).json({ error: 'Pedido no encontrado' }); }
+    const pedido = rows[0];
+    const nombresFotos = pedido.fotos.split(',').map(s => s.trim());
+    const placeholders = nombresFotos.map(() => '?').join(',');
+    const [fotosRows] = await conn.execute(`SELECT * FROM fotos WHERE nombre IN (${placeholders})`, nombresFotos);
+    await conn.end();
+    if (fotosRows.length === 0) return res.status(404).json({ error: 'No se encontraron las fotos de este pedido' });
+    const linksHtml = fotosRows.map(f => `<li><a href="${f.url_descarga}" target="_blank">${f.nombre}</a></li>`).join('');
+    const html = `
+      <h2>¡Gracias por tu compra en Foco Salvaje!</h2>
+      <p>Hola ${pedido.nombre}, acá tenés los links de descarga de tus fotos en alta resolución:</p>
+      <ul>${linksHtml}</ul>
+      <p>Cualquier consulta, escribinos a focosalvajeph@gmail.com</p>
+    `;
+    const enviado = await enviarEmail({ to: pedido.email, subject: '¡Tus fotos de Foco Salvaje están listas!', html });
+    if (enviado) res.json({ ok: true });
+    else res.status(500).json({ error: 'No se pudo enviar el email' });
+  } catch (err) {
+    console.error('Error reenviando fotos:', err.message);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 app.post('/fs2026entregar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -799,7 +827,7 @@ app.get('/fs2026pedidos', async (req, res) => {
   <div class="table-wrap">
     <div class="table-scroll">
       <table>
-        <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th><th></th><th></th></tr></thead>
         <tbody>
           ${paginated.map(r => `<tr id="pedido-${r.id}">
             <td><strong>${r.id}</strong></td>
@@ -811,6 +839,7 @@ app.get('/fs2026pedidos', async (req, res) => {
             <td><button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button></td>
             <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})}</td>
             <td><button onclick="eliminarPedido(${r.id})" style="border:none;background:#fee2e2;color:#991b1b;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🗑</button></td>
+            <td><button onclick="reenviarFotos(${r.id})" style="border:none;background:#e0f2fe;color:#075985;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;">📧 Reenviar</button></td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -831,6 +860,13 @@ async function eliminarPedido(id){
   const res=await fetch('/fs2026eliminar-pedido/'+id,{method:'POST'});
   const data=await res.json();
   if(data.ok)document.getElementById('pedido-'+id).remove();
+}
+async function reenviarFotos(id){
+  if(!confirm('¿Reenviar las fotos de este pedido por email?'))return;
+  const res=await fetch('/fs2026reenviar/'+id,{method:'POST'});
+  const data=await res.json();
+  if(data.ok)alert('✓ Email reenviado correctamente.');
+  else alert('Error: '+(data.error||'No se pudo reenviar'));
 }
 async function toggleEntregar(id,btn){
   const res=await fetch('/fs2026entregar/'+id,{method:'POST'});

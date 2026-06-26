@@ -48,31 +48,8 @@ const dbConfig = {
 async function initDB() {
   try {
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS pedidos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        fotos TEXT NOT NULL,
-        total DECIMAL(10,2) NOT NULL,
-        estado VARCHAR(50) DEFAULT 'pendiente',
-        entregado TINYINT(1) DEFAULT 0,
-        mp_preference_id VARCHAR(255),
-        mp_payment_id VARCHAR(255),
-        fecha DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS fotos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(255) NOT NULL,
-        categoria VARCHAR(50) DEFAULT 'accion',
-        precio DECIMAL(10,2) NOT NULL,
-        url_galeria VARCHAR(500) NOT NULL,
-        url_descarga VARCHAR(500) NOT NULL,
-        fecha DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS pedidos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, fotos TEXT NOT NULL, total DECIMAL(10,2) NOT NULL, estado VARCHAR(50) DEFAULT 'pendiente', entregado TINYINT(1) DEFAULT 0, mp_preference_id VARCHAR(255), mp_payment_id VARCHAR(255), fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS fotos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, categoria VARCHAR(50) DEFAULT 'accion', precio DECIMAL(10,2) NOT NULL, url_galeria VARCHAR(500) NOT NULL, url_descarga VARCHAR(500) NOT NULL, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN entregado TINYINT(1) DEFAULT 0'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_preference_id VARCHAR(255)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_payment_id VARCHAR(255)'); } catch(e) {}
@@ -91,40 +68,44 @@ app.get('/api/fotos', async (req, res) => {
     const [rows] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
     await conn.end();
     res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Error' });
-  }
+  } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
 app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descarga'}]), async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
     const { nombre, categoria, precio } = req.body;
-    if (!nombre || !categoria || !precio || !req.files?.foto_galeria || !req.files?.foto_descarga) {
+    if (!nombre || !categoria || !precio || !req.files?.foto_galeria || !req.files?.foto_descarga)
       return res.status(400).json({ error: 'Faltan datos' });
-    }
     const galResult = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        { folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}` },
-        (err, result) => err ? reject(err) : resolve(result)
-      ).end(req.files.foto_galeria[0].buffer);
+      cloudinary.uploader.upload_stream({ folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_galeria[0].buffer);
     });
     const descResult = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        { folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}` },
-        (err, result) => err ? reject(err) : resolve(result)
-      ).end(req.files.foto_descarga[0].buffer);
+      cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_descarga[0].buffer);
     });
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute(
-      'INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga) VALUES (?, ?, ?, ?, ?)',
-      [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url]
-    );
+    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga) VALUES (?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url]);
     await conn.end();
     res.json({ ok: true });
   } catch (err) {
     console.error('Error subiendo foto:', err);
     res.status(500).json({ error: 'Error subiendo foto' });
+  }
+});
+
+// Editar foto (nombre, categoría, precio — sin reemplazar imágenes)
+app.post('/fs2026editar/:id', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const { nombre, categoria, precio } = req.body;
+    if (!nombre || !categoria || !precio) return res.status(400).json({ error: 'Faltan datos' });
+    const conn = await mysql.createConnection(dbConfig);
+    await conn.execute('UPDATE fotos SET nombre = ?, categoria = ?, precio = ? WHERE id = ?', [nombre, categoria, parseFloat(precio), req.params.id]);
+    await conn.end();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error editando foto:', err);
+    res.status(500).json({ error: 'Error' });
   }
 });
 
@@ -135,9 +116,7 @@ app.post('/fs2026eliminar/:id', async (req, res) => {
     await conn.execute('DELETE FROM fotos WHERE id = ?', [req.params.id]);
     await conn.end();
     res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Error' });
-  }
+  } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
 app.post('/crear-preferencia', async (req, res) => {
@@ -146,19 +125,9 @@ app.post('/crear-preferencia', async (req, res) => {
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
-        items: items.map(item => ({
-          id: String(item.id),
-          title: item.name,
-          quantity: 1,
-          unit_price: item.price,
-          currency_id: 'ARS',
-        })),
+        items: items.map(item => ({ id: String(item.id), title: item.name, quantity: 1, unit_price: item.price, currency_id: 'ARS' })),
         payer: buyer ? { name: buyer.name, email: buyer.email } : undefined,
-        back_urls: {
-          success: `${BASE_URL}/pago-exitoso`,
-          failure: `${BASE_URL}/pago-fallido`,
-          pending: `${BASE_URL}/pago-pendiente`,
-        },
+        back_urls: { success: `${BASE_URL}/pago-exitoso`, failure: `${BASE_URL}/pago-fallido`, pending: `${BASE_URL}/pago-pendiente` },
         notification_url: `${BASE_URL}/webhook`,
         statement_descriptor: 'Foco Salvaje',
       }
@@ -168,10 +137,7 @@ app.post('/crear-preferencia', async (req, res) => {
         const conn = await mysql.createConnection(dbConfig);
         const fotos = items.map(i => i.name).join(', ');
         const total = items.reduce((s, i) => s + i.price, 0);
-        await conn.execute(
-          'INSERT INTO pedidos (nombre, email, fotos, total, estado, mp_preference_id) VALUES (?, ?, ?, ?, ?, ?)',
-          [buyer.name, buyer.email, fotos, total, 'pendiente', result.id]
-        );
+        await conn.execute('INSERT INTO pedidos (nombre, email, fotos, total, estado, mp_preference_id) VALUES (?, ?, ?, ?, ?, ?)', [buyer.name, buyer.email, fotos, total, 'pendiente', result.id]);
         await conn.end();
       } catch (dbErr) { console.error('Error guardando pedido:', dbErr.message); }
     }
@@ -182,42 +148,24 @@ app.post('/crear-preferencia', async (req, res) => {
   }
 });
 
-// Función para actualizar pedido por payment_id
 async function actualizarPedidoPorPago(paymentId) {
   try {
     const payment = new Payment(client);
     const paymentInfo = await payment.get({ id: Number(paymentId) });
     console.log('Payment status:', paymentInfo.status, '| email:', paymentInfo.payer?.email);
-
     let estado = 'pendiente';
     if (paymentInfo.status === 'approved') estado = 'exitoso';
     if (paymentInfo.status === 'rejected') estado = 'fallido';
-
     const conn = await mysql.createConnection(dbConfig);
-
-    // 1. Buscar por preference_id
     if (paymentInfo.preference_id) {
-      const [r1] = await conn.execute(
-        'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?',
-        [estado, String(paymentId), paymentInfo.preference_id]
-      );
-      if (r1.affectedRows > 0) {
-        console.log('Actualizado por preference_id:', r1.affectedRows, 'filas');
-        await conn.end();
-        return { estado, payerEmail: paymentInfo.payer?.email };
-      }
+      const [r1] = await conn.execute('UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?', [estado, String(paymentId), paymentInfo.preference_id]);
+      if (r1.affectedRows > 0) { await conn.end(); return { estado, payerEmail: paymentInfo.payer?.email }; }
     }
-
-    // 2. Buscar por email del comprador
     const payerEmail = paymentInfo.payer?.email;
     if (payerEmail) {
-      const [r2] = await conn.execute(
-        'UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1',
-        [estado, String(paymentId), payerEmail]
-      );
+      const [r2] = await conn.execute('UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1', [estado, String(paymentId), payerEmail]);
       console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
     }
-
     await conn.end();
     return { estado, payerEmail: paymentInfo.payer?.email };
   } catch (err) {
@@ -226,16 +174,12 @@ async function actualizarPedidoPorPago(paymentId) {
   }
 }
 
-// Webhook MP
 app.post('/webhook', async (req, res) => {
   try {
     console.log('Webhook recibido:', JSON.stringify(req.body));
     let paymentId = null;
-    if (req.body.type === 'payment' && req.body.data?.id) {
-      paymentId = req.body.data.id;
-    } else if (req.body.topic === 'payment' && req.body.resource) {
-      paymentId = req.body.resource;
-    }
+    if (req.body.type === 'payment' && req.body.data?.id) paymentId = req.body.data.id;
+    else if (req.body.topic === 'payment' && req.body.resource) paymentId = req.body.resource;
     if (paymentId) await actualizarPedidoPorPago(paymentId);
     res.sendStatus(200);
   } catch (err) {
@@ -244,7 +188,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Pago exitoso — doble seguro con payment_id de la URL
 app.get('/pago-exitoso', async (req, res) => {
   const paymentId = req.query.payment_id;
   if (paymentId) {
@@ -254,7 +197,6 @@ app.get('/pago-exitoso', async (req, res) => {
   res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
 });
 
-// Eliminar pedido
 app.post('/fs2026eliminar-pedido/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -313,18 +255,11 @@ app.get('/fs2026admin', (req, res) => {
 });
 
 app.post('/fs2026admin', (req, res) => {
-  if (req.body.pass === 'Nicotina48') {
-    req.session.admin = true;
-    res.redirect('/fs2026pedidos');
-  } else {
-    res.redirect('/fs2026admin?error=1');
-  }
+  if (req.body.pass === 'Nicotina48') { req.session.admin = true; res.redirect('/fs2026pedidos'); }
+  else res.redirect('/fs2026admin?error=1');
 });
 
-app.get('/fs2026logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/fs2026admin');
-});
+app.get('/fs2026logout', (req, res) => { req.session.destroy(); res.redirect('/fs2026admin'); });
 
 app.get('/fs2026fotos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');
@@ -369,12 +304,22 @@ app.get('/fs2026fotos', async (req, res) => {
   .foto-nombre{font-size:13px;font-weight:600;color:#111827}
   .foto-cat{font-size:11px;color:#6b7280;margin-top:2px;text-transform:capitalize}
   .foto-precio{font-size:14px;font-weight:700;color:#04342C;margin-top:6px}
-  .btn-eliminar{width:100%;margin-top:8px;background:#fee2e2;color:#991b1b;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn-row{display:flex;gap:6px;margin-top:8px}
+  .btn-editar{flex:1;background:#e0f2fe;color:#075985;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn-editar:hover{background:#bae6fd}
+  .btn-eliminar{flex:1;background:#fee2e2;color:#991b1b;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
   .btn-eliminar:hover{background:#fecaca}
   .empty{text-align:center;padding:48px;color:#9ca3af;background:white;border-radius:12px}
   .msg{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
   .msg.ok{background:#d1fae5;color:#065f46;display:block}
   .msg.err{background:#fee2e2;color:#991b1b;display:block}
+  .edit-form{display:none;padding:12px;background:#f8fafc;border-top:1px solid #e5e7eb}
+  .edit-form.open{display:block}
+  .edit-form .fg{margin-bottom:8px}
+  .edit-form input,.edit-form select{padding:7px 9px;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;width:100%;font-family:inherit}
+  .edit-actions{display:flex;gap:6px;margin-top:8px}
+  .btn-guardar{flex:1;background:#04342C;color:white;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
   @media(max-width:600px){.form-grid{grid-template-columns:1fr}.fotos-grid{grid-template-columns:repeat(2,1fr)}}
 </style></head>
 <body>
@@ -415,10 +360,29 @@ app.get('/fs2026fotos', async (req, res) => {
     ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}">
       <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
       <div class="foto-info">
-        <div class="foto-nombre">${f.nombre}</div>
-        <div class="foto-cat">${f.categoria}</div>
-        <div class="foto-precio">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</div>
-        <button class="btn-eliminar" onclick="eliminarFoto(${f.id})">🗑 Eliminar</button>
+        <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
+        <div class="foto-cat" id="cat-${f.id}">${f.categoria}</div>
+        <div class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</div>
+        <div class="btn-row">
+          <button class="btn-editar" onclick="toggleEdit(${f.id})">✏️ Editar</button>
+          <button class="btn-eliminar" onclick="eliminarFoto(${f.id})">🗑 Eliminar</button>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-${f.id}">
+        <div class="fg"><label>Nombre</label><input type="text" id="edit-nombre-${f.id}" value="${f.nombre}"></div>
+        <div class="fg"><label>Categoría</label>
+          <select id="edit-cat-${f.id}">
+            <option value="accion" ${f.categoria==='accion'?'selected':''}>Acción</option>
+            <option value="retrato" ${f.categoria==='retrato'?'selected':''}>Retrato</option>
+            <option value="paisaje" ${f.categoria==='paisaje'?'selected':''}>Paisaje & Naturaleza</option>
+            <option value="campeonato" ${f.categoria==='campeonato'?'selected':''}>Campeonato de Pesca</option>
+          </select>
+        </div>
+        <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}"></div>
+        <div class="edit-actions">
+          <button class="btn-guardar" onclick="guardarEdit(${f.id})">Guardar</button>
+          <button class="btn-cancelar" onclick="toggleEdit(${f.id})">Cancelar</button>
+        </div>
       </div>
     </div>`).join('')}
   </div>`}
@@ -442,6 +406,30 @@ async function eliminarFoto(id){
   const res=await fetch('/fs2026eliminar/'+id,{method:'POST'});
   const data=await res.json();
   if(data.ok)document.getElementById('foto-'+id).remove();
+}
+function toggleEdit(id){
+  document.getElementById('edit-'+id).classList.toggle('open');
+}
+const CAT_LABELS={accion:'Acción',retrato:'Retrato',paisaje:'Paisaje & Naturaleza',campeonato:'Campeonato de Pesca'};
+async function guardarEdit(id){
+  const nombre=document.getElementById('edit-nombre-'+id).value.trim();
+  const categoria=document.getElementById('edit-cat-'+id).value;
+  const precio=document.getElementById('edit-precio-'+id).value;
+  if(!nombre||!precio){alert('Completá nombre y precio');return;}
+  const res=await fetch('/fs2026editar/'+id,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({nombre,categoria,precio})
+  });
+  const data=await res.json();
+  if(data.ok){
+    document.getElementById('nombre-'+id).textContent=nombre;
+    document.getElementById('cat-'+id).textContent=categoria;
+    document.getElementById('precio-'+id).textContent='$ '+parseFloat(precio).toLocaleString('es-AR');
+    toggleEdit(id);
+  } else {
+    alert('Error al guardar: '+(data.error||''));
+  }
 }
 </script>
 </body></html>`);

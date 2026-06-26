@@ -287,9 +287,10 @@ app.get('/fs2026fotos', async (req, res) => {
   .fg label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px}
   .fg input,.fg select{padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;outline:none;transition:border 0.2s}
   .fg input:focus,.fg select:focus{border-color:#1D9E75}
-  .file-input-wrap{border:2px dashed #e5e7eb;border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border 0.2s;position:relative}
+  .file-input-wrap{border:2px dashed #e5e7eb;border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border 0.2s;position:relative;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center}
   .file-input-wrap:hover{border-color:#1D9E75}
-  .file-input-wrap input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .file-input-wrap input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2}
+  .file-preview-img{max-width:100%;max-height:120px;border-radius:6px;margin-bottom:8px;display:none;object-fit:cover}
   .file-icon{font-size:28px;margin-bottom:8px}
   .file-label{font-size:13px;color:#6b7280}
   .file-sublabel{font-size:11px;color:#9ca3af;margin-top:4px}
@@ -344,11 +345,11 @@ app.get('/fs2026fotos', async (req, res) => {
       <div class="form-grid" style="margin-top:16px">
         <div class="fg">
           <label>Foto con marca de agua (galería)</label>
-          <div class="file-input-wrap"><input type="file" name="foto_galeria" accept="image/*" onchange="showName(this,'name1')" required><div class="file-icon">🖼️</div><div class="file-label">Tocá para elegir la foto</div><div class="file-sublabel">Se muestra en la galería</div><div class="file-name" id="name1"></div></div>
+          <div class="file-input-wrap"><input type="file" name="foto_galeria" accept="image/*" onchange="showPreview(this,'name1','prev1')" required><img class="file-preview-img" id="prev1"><div class="file-icon" id="icon1">🖼️</div><div class="file-label" id="label1">Tocá para elegir la foto</div><div class="file-sublabel">Se muestra en la galería</div><div class="file-name" id="name1"></div></div>
         </div>
         <div class="fg">
           <label>Foto sin marca de agua (descarga)</label>
-          <div class="file-input-wrap"><input type="file" name="foto_descarga" accept="image/*" onchange="showName(this,'name2')" required><div class="file-icon">⬇️</div><div class="file-label">Tocá para elegir la foto</div><div class="file-sublabel">Se manda al comprador</div><div class="file-name" id="name2"></div></div>
+          <div class="file-input-wrap"><input type="file" name="foto_descarga" accept="image/*" onchange="showPreview(this,'name2','prev2')" required><img class="file-preview-img" id="prev2"><div class="file-icon" id="icon2">⬇️</div><div class="file-label" id="label2">Tocá para elegir la foto</div><div class="file-sublabel">Se manda al comprador</div><div class="file-name" id="name2"></div></div>
         </div>
       </div>
       <button class="btn-subir" type="submit" id="btnSubir">Subir foto</button>
@@ -388,7 +389,21 @@ app.get('/fs2026fotos', async (req, res) => {
   </div>`}
 </div>
 <script>
-function showName(input,id){document.getElementById(id).textContent=input.files[0]?.name||'';}
+function showPreview(input,nameId,prevId){
+  const file=input.files[0];
+  document.getElementById(nameId).textContent=file?.name||'';
+  const img=document.getElementById(prevId);
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      img.src=e.target.result;
+      img.style.display='block';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    img.style.display='none';
+  }
+}
 document.getElementById('uploadForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const btn=document.getElementById('btnSubir');btn.disabled=true;btn.textContent='Subiendo...';
@@ -396,7 +411,12 @@ document.getElementById('uploadForm').addEventListener('submit',async e=>{
   try{
     const res=await fetch('/fs2026subir',{method:'POST',body:new FormData(e.target)});
     const data=await res.json();
-    if(data.ok){msg.className='msg ok';msg.textContent='✓ Foto subida. Recargá la página para verla.';e.target.reset();document.getElementById('name1').textContent='';document.getElementById('name2').textContent='';}
+    if(data.ok){
+      msg.className='msg ok';msg.textContent='✓ Foto subida. Recargá la página para verla.';
+      e.target.reset();
+      document.getElementById('name1').textContent='';document.getElementById('name2').textContent='';
+      document.getElementById('prev1').style.display='none';document.getElementById('prev2').style.display='none';
+    }
     else{msg.className='msg err';msg.textContent='Error: '+(data.error||'No se pudo subir');}
   }catch(err){msg.className='msg err';msg.textContent='Error de conexión.';}
   btn.disabled=false;btn.textContent='Subir foto';

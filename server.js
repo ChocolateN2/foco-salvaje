@@ -93,7 +93,6 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
   }
 });
 
-// Editar foto (nombre, categoría, precio — sin reemplazar imágenes)
 app.post('/fs2026editar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
@@ -379,8 +378,9 @@ app.get('/fs2026fotos', async (req, res) => {
   </div>
 
   <div class="gallery-header">
-    <div class="gallery-title">Fotos en la galería (${fotos.length})</div>
+    <div class="gallery-title" id="galleryTitle">Fotos en la galería (${fotos.length})</div>
   </div>
+  <div id="fotosContainer">
   ${fotos.length === 0 ? '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>' : `
   <div class="fotos-grid">
     ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}">
@@ -417,18 +417,78 @@ app.get('/fs2026fotos', async (req, res) => {
       </div>
     </div>`).join('')}
   </div>`}
+  </div>
 </div>
 <script>
-const CAT_LABELS={accion:'Acción',retrato:'Retrato',paisaje:'Paisaje & Naturaleza',campeonato:'Campeonato de Pesca'};
+var CAT_LABELS = {accion:'Acción', retrato:'Retrato', paisaje:'Paisaje & Naturaleza', campeonato:'Campeonato de Pesca'};
+
+function fotoCardHTML(f) {
+  var catLabel = CAT_LABELS[f.categoria] || f.categoria;
+  var html = '';
+  html += '<div class="foto-card" id="foto-' + f.id + '">';
+  html += '<div class="foto-img-wrap">';
+  html += '<img class="foto-img" src="' + f.url_galeria + '" alt="' + f.nombre + '">';
+  html += '<div class="foto-id-badge">#' + String(f.id).padStart(3,'0') + '</div>';
+  html += '</div>';
+  html += '<div class="foto-info">';
+  html += '<div class="foto-nombre" id="nombre-' + f.id + '">' + f.nombre + '</div>';
+  html += '<div class="foto-meta-row">';
+  html += '<span class="foto-cat-pill" id="cat-' + f.id + '" data-cat="' + f.categoria + '">' + catLabel + '</span>';
+  html += '<span class="foto-precio" id="precio-' + f.id + '">$ ' + parseFloat(f.precio).toLocaleString('es-AR') + '</span>';
+  html += '</div>';
+  html += '<div class="btn-row">';
+  html += '<button class="btn-editar" onclick="toggleEdit(' + f.id + ')">\u270f\ufe0f Editar</button>';
+  html += '<button class="btn-eliminar" onclick="eliminarFoto(' + f.id + ')">\ud83d\uddd1 Eliminar</button>';
+  html += '</div>';
+  html += '</div>';
+  html += '<div class="edit-form" id="edit-' + f.id + '">';
+  html += '<div class="fg"><label>Nombre</label><input type="text" id="edit-nombre-' + f.id + '" value="' + f.nombre + '"></div>';
+  html += '<div class="fg"><label>Categor\u00eda</label>';
+  html += '<select id="edit-cat-' + f.id + '">';
+  html += '<option value="accion"' + (f.categoria==='accion'?' selected':'') + '>Acci\u00f3n</option>';
+  html += '<option value="retrato"' + (f.categoria==='retrato'?' selected':'') + '>Retrato</option>';
+  html += '<option value="paisaje"' + (f.categoria==='paisaje'?' selected':'') + '>Paisaje & Naturaleza</option>';
+  html += '<option value="campeonato"' + (f.categoria==='campeonato'?' selected':'') + '>Campeonato de Pesca</option>';
+  html += '</select>';
+  html += '</div>';
+  html += '<div class="fg"><label>Precio</label><input type="number" id="edit-precio-' + f.id + '" value="' + f.precio + '" min="1" step="1"></div>';
+  html += '<div class="edit-actions">';
+  html += '<button class="btn-guardar" onclick="guardarEdit(' + f.id + ')">Guardar</button>';
+  html += '<button class="btn-cancelar" onclick="toggleEdit(' + f.id + ')">Cancelar</button>';
+  html += '</div>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function refrescarGaleria() {
+  return fetch('/api/fotos')
+    .then(function(res){ return res.json(); })
+    .then(function(fotos){
+      document.getElementById('galleryTitle').textContent = 'Fotos en la galería (' + fotos.length + ')';
+      var cont = document.getElementById('fotosContainer');
+      if (fotos.length === 0) {
+        cont.innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
+      } else {
+        var gridHtml = '<div class="fotos-grid">';
+        for (var i = 0; i < fotos.length; i++) {
+          gridHtml += fotoCardHTML(fotos[i]);
+        }
+        gridHtml += '</div>';
+        cont.innerHTML = gridHtml;
+      }
+    })
+    .catch(function(err){ console.error('Error refrescando galería:', err); });
+}
 
 function showPreview(input,nameId,prevId,wrapId){
   const file=input.files[0];
-  document.getElementById(nameId).textContent=file?.name||'';
+  document.getElementById(nameId).textContent=file?file.name:'';
   const img=document.getElementById(prevId);
   const wrap=document.getElementById(wrapId);
   if(file){
     const reader=new FileReader();
-    reader.onload=e=>{
+    reader.onload=function(e){
       img.src=e.target.result;
       img.style.display='block';
       wrap.classList.add('has-preview');
@@ -440,72 +500,101 @@ function showPreview(input,nameId,prevId,wrapId){
   }
 }
 
-document.getElementById('uploadForm').addEventListener('submit',async e=>{
+document.getElementById('uploadForm').addEventListener('submit',function(e){
   e.preventDefault();
-  const precioInput = e.target.querySelector('input[name="precio"]');
+  const form = e.target;
+  const precioInput = form.querySelector('input[name="precio"]');
+  const msg=document.getElementById('msg');
   if (parseFloat(precioInput.value) <= 0 || !precioInput.value) {
-    const msg=document.getElementById('msg');
     msg.className='msg err';
     msg.textContent='El precio debe ser mayor a $0';
     precioInput.focus();
     return;
   }
-  const btn=document.getElementById('btnSubir');btn.disabled=true;btn.textContent='Subiendo...';
-  const msg=document.getElementById('msg');msg.className='msg';msg.textContent='';
-  try{
-    const res=await fetch('/fs2026subir',{method:'POST',body:new FormData(e.target)});
-    const data=await res.json();
-    if(data.ok){
-      msg.className='msg ok';msg.textContent='✓ Foto subida correctamente. Recargá la página para verla.';
-      e.target.reset();
-      document.getElementById('name1').textContent='';document.getElementById('name2').textContent='';
-      document.getElementById('prev1').style.display='none';document.getElementById('prev2').style.display='none';
-      document.getElementById('wrap1').classList.remove('has-preview');document.getElementById('wrap2').classList.remove('has-preview');
-    }
-    else{msg.className='msg err';msg.textContent='Error: '+(data.error||'No se pudo subir');}
-  }catch(err){msg.className='msg err';msg.textContent='Error de conexión.';}
-  btn.disabled=false;btn.textContent='Subir foto';
+  const btn=document.getElementById('btnSubir');
+  btn.disabled=true;btn.textContent='Subiendo...';
+  msg.className='msg';msg.textContent='';
+  fetch('/fs2026subir',{method:'POST',body:new FormData(form)})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.ok){
+        msg.className='msg ok';
+        msg.textContent='✓ Foto subida correctamente.';
+        form.reset();
+        document.getElementById('name1').textContent='';
+        document.getElementById('name2').textContent='';
+        document.getElementById('prev1').style.display='none';
+        document.getElementById('prev2').style.display='none';
+        document.getElementById('wrap1').classList.remove('has-preview');
+        document.getElementById('wrap2').classList.remove('has-preview');
+        return refrescarGaleria().then(function(){
+          setTimeout(function(){ msg.className='msg'; msg.textContent=''; }, 3500);
+        });
+      } else {
+        msg.className='msg err';
+        msg.textContent='Error: '+(data.error||'No se pudo subir');
+      }
+    })
+    .catch(function(){
+      msg.className='msg err';
+      msg.textContent='Error de conexión.';
+    })
+    .finally(function(){
+      btn.disabled=false;btn.textContent='Subir foto';
+    });
 });
 
-async function eliminarFoto(id){
+function eliminarFoto(id){
   if(!confirm('¿Eliminar esta foto?'))return;
-  const res=await fetch('/fs2026eliminar/'+id,{method:'POST'});
-  const data=await res.json();
-  if(data.ok)document.getElementById('foto-'+id).remove();
+  fetch('/fs2026eliminar/'+id,{method:'POST'})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.ok){
+        var el = document.getElementById('foto-'+id);
+        if(el) el.remove();
+        var title = document.getElementById('galleryTitle');
+        var current = document.querySelectorAll('.foto-card').length;
+        title.textContent = 'Fotos en la galería (' + current + ')';
+        if(current === 0){
+          document.getElementById('fotosContainer').innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
+        }
+      }
+    });
 }
 
 function toggleEdit(id){
   document.getElementById('edit-'+id).classList.toggle('open');
 }
 
-async function guardarEdit(id){
+function guardarEdit(id){
   const nombre=document.getElementById('edit-nombre-'+id).value.trim();
   const categoria=document.getElementById('edit-cat-'+id).value;
   const precio=document.getElementById('edit-precio-'+id).value;
   if(!nombre){alert('El nombre no puede estar vacío');return;}
   if(!precio || parseFloat(precio) <= 0){alert('El precio debe ser mayor a $0');return;}
-  const res=await fetch('/fs2026editar/'+id,{
+  fetch('/fs2026editar/'+id,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({nombre,categoria,precio})
-  });
-  const data=await res.json();
-  if(data.ok){
-    document.getElementById('nombre-'+id).textContent=nombre;
-    const catEl=document.getElementById('cat-'+id);
-    catEl.textContent=CAT_LABELS[categoria]||categoria;
-    catEl.dataset.cat=categoria;
-    document.getElementById('precio-'+id).textContent='$ '+parseFloat(precio).toLocaleString('es-AR');
-    toggleEdit(id);
-  } else {
-    alert('Error al guardar: '+(data.error||''));
-  }
+    body:JSON.stringify({nombre:nombre,categoria:categoria,precio:precio})
+  })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.ok){
+        document.getElementById('nombre-'+id).textContent=nombre;
+        const catEl=document.getElementById('cat-'+id);
+        catEl.textContent=CAT_LABELS[categoria]||categoria;
+        catEl.dataset.cat=categoria;
+        document.getElementById('precio-'+id).textContent='$ '+parseFloat(precio).toLocaleString('es-AR');
+        toggleEdit(id);
+      } else {
+        alert('Error al guardar: '+(data.error||''));
+      }
+    });
 }
 </script>
 </body></html>`);
   } catch (err) { res.status(500).send('Error'); }
 });
-
 
 app.get('/fs2026pedidos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');

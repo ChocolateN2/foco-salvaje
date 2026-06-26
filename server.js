@@ -266,6 +266,8 @@ app.get('/fs2026fotos', async (req, res) => {
     const conn = await mysql.createConnection(dbConfig);
     const [fotos] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
     await conn.end();
+    // fotos ya viene ordenado por fecha DESC, así que el índice+1 es el número correlativo (más nueva = #1)
+    fotos.forEach((f, idx) => { f.displayNum = idx + 1; });
     const CAT_LABELS = { accion: 'Acción', retrato: 'Retrato', paisaje: 'Paisaje & Naturaleza', campeonato: 'Campeonato de Pesca' };
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -386,7 +388,7 @@ app.get('/fs2026fotos', async (req, res) => {
     ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}">
       <div class="foto-img-wrap">
         <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
-        <div class="foto-id-badge">#${String(f.id).padStart(3,'0')}</div>
+        <div class="foto-id-badge">#${String(f.displayNum).padStart(3,'0')}</div>
       </div>
       <div class="foto-info">
         <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
@@ -422,13 +424,13 @@ app.get('/fs2026fotos', async (req, res) => {
 <script>
 var CAT_LABELS = {accion:'Acción', retrato:'Retrato', paisaje:'Paisaje & Naturaleza', campeonato:'Campeonato de Pesca'};
 
-function fotoCardHTML(f) {
+function fotoCardHTML(f, displayNum) {
   var catLabel = CAT_LABELS[f.categoria] || f.categoria;
   var html = '';
   html += '<div class="foto-card" id="foto-' + f.id + '">';
   html += '<div class="foto-img-wrap">';
   html += '<img class="foto-img" src="' + f.url_galeria + '" alt="' + f.nombre + '">';
-  html += '<div class="foto-id-badge">#' + String(f.id).padStart(3,'0') + '</div>';
+  html += '<div class="foto-id-badge">#' + String(displayNum).padStart(3,'0') + '</div>';
   html += '</div>';
   html += '<div class="foto-info">';
   html += '<div class="foto-nombre" id="nombre-' + f.id + '">' + f.nombre + '</div>';
@@ -470,9 +472,10 @@ function refrescarGaleria() {
       if (fotos.length === 0) {
         cont.innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
       } else {
+        // /api/fotos viene ordenado por fecha DESC, así que el índice+1 es el número correlativo
         var gridHtml = '<div class="fotos-grid">';
         for (var i = 0; i < fotos.length; i++) {
-          gridHtml += fotoCardHTML(fotos[i]);
+          gridHtml += fotoCardHTML(fotos[i], i + 1);
         }
         gridHtml += '</div>';
         cont.innerHTML = gridHtml;

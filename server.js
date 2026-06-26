@@ -33,6 +33,41 @@ const client = new MercadoPagoConfig({
   options: { timeout: 5000 }
 });
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const NOTIFY_EMAIL = 'nankarsw80@gmail.com';
+
+async function enviarEmail({ to, subject, html }) {
+  if (!RESEND_API_KEY) {
+    console.error('RESEND_API_KEY no configurada, no se envió el email');
+    return false;
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Foco Salvaje <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Error enviando email:', data);
+      return false;
+    }
+    console.log('Email enviado:', data.id);
+    return true;
+  } catch (err) {
+    console.error('Error enviando email:', err.message);
+    return false;
+  }
+}
+
 const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : 'http://localhost:8080';
@@ -118,6 +153,26 @@ app.post('/fs2026eliminar/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Error' }); }
 });
 
+app.post('/contacto', async (req, res) => {
+  try {
+    const { nombre, email, mensaje } = req.body;
+    if (!nombre || !email || !mensaje) return res.status(400).json({ error: 'Faltan datos' });
+    const html = `
+      <h2>Nuevo mensaje de contacto — Foco Salvaje</h2>
+      <p><strong>Nombre:</strong> ${nombre}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Mensaje:</strong></p>
+      <p>${mensaje.replace(/\n/g, '<br>')}</p>
+    `;
+    const enviado = await enviarEmail({ to: NOTIFY_EMAIL, subject: `Nuevo mensaje de ${nombre}`, html });
+    if (enviado) res.json({ ok: true });
+    else res.status(500).json({ error: 'No se pudo enviar el mensaje' });
+  } catch (err) {
+    console.error('Error en /contacto:', err.message);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 app.post('/crear-preferencia', async (req, res) => {
   try {
     const { items, buyer } = req.body;
@@ -156,17 +211,49 @@ async function actualizarPedidoPorPago(paymentId) {
     if (paymentInfo.status === 'approved') estado = 'exitoso';
     if (paymentInfo.status === 'rejected') estado = 'fallido';
     const conn = await mysql.createConnection(dbConfig);
+    let pedidoActualizado = null;
     if (paymentInfo.preference_id) {
       const [r1] = await conn.execute('UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE mp_preference_id = ?', [estado, String(paymentId), paymentInfo.preference_id]);
-      if (r1.affectedRows > 0) { await conn.end(); return { estado, payerEmail: paymentInfo.payer?.email }; }
+      if (r1.affectedRows > 0) {
+        const [rows] = await conn.execute('SELECT * FROM pedidos WHERE mp_preference_id = ?', [paymentInfo.preference_id]);
+        pedidoActualizado = rows[0];
+      }
     }
-    const payerEmail = paymentInfo.payer?.email;
-    if (payerEmail) {
-      const [r2] = await conn.execute('UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1', [estado, String(paymentId), payerEmail]);
-      console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
+    if (!pedidoActualizado) {
+      const payerEmail = paymentInfo.payer?.email;
+      if (payerEmail) {
+        const [r2] = await conn.execute('UPDATE pedidos SET estado = ?, mp_payment_id = ? WHERE email = ? AND estado = "pendiente" ORDER BY fecha DESC LIMIT 1', [estado, String(paymentId), payerEmail]);
+        console.log('Por email (', payerEmail, '):', r2.affectedRows, 'filas | estado:', estado);
+        if (r2.affectedRows > 0) {
+          const [rows] = await conn.execute('SELECT * FROM pedidos WHERE email = ? ORDER BY fecha DESC LIMIT 1', [payerEmail]);
+          pedidoActualizado = rows[0];
+        }
+      }
     }
+
+    // Si el pago fue aprobado, mandar las fotos por email
+    if (estado === 'exitoso' && pedidoActualizado) {
+      try {
+        const nombresFotos = pedidoActualizado.fotos.split(',').map(s => s.trim());
+        const placeholders = nombresFotos.map(() => '?').join(',');
+        const [fotosRows] = await conn.execute(`SELECT * FROM fotos WHERE nombre IN (${placeholders})`, nombresFotos);
+        if (fotosRows.length > 0) {
+          const linksHtml = fotosRows.map(f => `<li><a href="${f.url_descarga}" target="_blank">${f.nombre}</a></li>`).join('');
+          const html = `
+            <h2>¡Gracias por tu compra en Foco Salvaje!</h2>
+            <p>Hola ${pedidoActualizado.nombre}, tu pago fue confirmado. Acá tenés los links de descarga de tus fotos en alta resolución:</p>
+            <ul>${linksHtml}</ul>
+            <p>Cualquier consulta, escribinos a focosalvajeph@gmail.com</p>
+          `;
+          await enviarEmail({ to: pedidoActualizado.email, subject: '¡Tus fotos de Foco Salvaje están listas!', html });
+        }
+      } catch (mailErr) {
+        console.error('Error mandando fotos por email:', mailErr.message);
+      }
+    }
+
     await conn.end();
-    return { estado, payerEmail: paymentInfo.payer?.email };
+    return { estado };
   } catch (err) {
     console.error('Error actualizando pedido:', err.message);
     return null;

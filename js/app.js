@@ -212,3 +212,60 @@ async function checkout(){
 
 function toggleCart(){document.getElementById('cartModal').classList.toggle('open');}
 function showToast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+async function enviarContacto(){
+  const nombre=document.getElementById('contactNombre').value.trim();
+  const email=document.getElementById('contactEmail').value.trim();
+  const mensaje=document.getElementById('contactMensaje').value.trim();
+  const msgBox=document.getElementById('contactMsg');
+  const btn=document.getElementById('contactBtn');
+
+  if(!nombre||!email||!mensaje){
+    msgBox.style.display='block';
+    msgBox.style.background='#fdecec';
+    msgBox.style.color='#b3261e';
+    msgBox.textContent='Completá todos los campos.';
+    return;
+  }
+  if(!email.includes('@')){
+    msgBox.style.display='block';
+    msgBox.style.background='#fdecec';
+    msgBox.style.color='#b3261e';
+    msgBox.textContent='Ingresá un email válido.';
+    return;
+  }
+
+  btn.disabled=true;
+  btn.textContent='Enviando...';
+  msgBox.style.display='none';
+
+  try{
+    const res=await fetch('/contacto',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nombre,email,mensaje})
+    });
+    const data=await res.json();
+    if(data.ok){
+      msgBox.style.display='block';
+      msgBox.style.background='#e3f7ee';
+      msgBox.style.color='#0a6b46';
+      msgBox.textContent='✓ Mensaje enviado. Te responderemos a la brevedad.';
+      document.getElementById('contactNombre').value='';
+      document.getElementById('contactEmail').value='';
+      document.getElementById('contactMensaje').value='';
+    } else {
+      msgBox.style.display='block';
+      msgBox.style.background='#fdecec';
+      msgBox.style.color='#b3261e';
+      msgBox.textContent='Error: '+(data.error||'No se pudo enviar');
+    }
+  } catch(e){
+    msgBox.style.display='block';
+    msgBox.style.background='#fdecec';
+    msgBox.style.color='#b3261e';
+    msgBox.textContent='Error de conexión. Intentá de nuevo.';
+  }
+  btn.disabled=false;
+  btn.textContent='Enviar mensaje';
+}

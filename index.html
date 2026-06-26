@@ -94,10 +94,11 @@
     </div>
     <div class="contact-form">
       <div class="form-title">Envianos un mensaje</div>
-      <div class="fgroup"><label>Tu nombre</label><input type="text" placeholder="Juan García"></div>
-      <div class="fgroup"><label>Tu email</label><input type="email" placeholder="juan@email.com"></div>
-      <div class="fgroup"><label>Mensaje</label><textarea placeholder="¿En qué te podemos ayudar?"></textarea></div>
-      <button class="fsub">Enviar mensaje</button>
+      <div id="contactMsg" style="display:none;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px"></div>
+      <div class="fgroup"><label>Tu nombre</label><input type="text" id="contactNombre" placeholder="Juan García"></div>
+      <div class="fgroup"><label>Tu email</label><input type="email" id="contactEmail" placeholder="juan@email.com"></div>
+      <div class="fgroup"><label>Mensaje</label><textarea id="contactMensaje" placeholder="¿En qué te podemos ayudar?"></textarea></div>
+      <button class="fsub" id="contactBtn" onclick="enviarContacto()">Enviar mensaje</button>
     </div>
   </div>
 </div>

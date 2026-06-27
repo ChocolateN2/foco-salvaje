@@ -85,10 +85,24 @@ async function initDB() {
     const conn = await mysql.createConnection(dbConfig);
     await conn.execute(`CREATE TABLE IF NOT EXISTS pedidos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, fotos TEXT NOT NULL, total DECIMAL(10,2) NOT NULL, estado VARCHAR(50) DEFAULT 'pendiente', entregado TINYINT(1) DEFAULT 0, mp_preference_id VARCHAR(255), mp_payment_id VARCHAR(255), fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     await conn.execute(`CREATE TABLE IF NOT EXISTS fotos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, categoria VARCHAR(50) DEFAULT 'accion', precio DECIMAL(10,2) NOT NULL, url_galeria VARCHAR(500) NOT NULL, url_descarga VARCHAR(500) NOT NULL, descripcion TEXT, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS categorias (id INT AUTO_INCREMENT PRIMARY KEY, slug VARCHAR(50) NOT NULL UNIQUE, nombre VARCHAR(100) NOT NULL, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     try { await conn.execute('ALTER TABLE fotos ADD COLUMN descripcion TEXT'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN entregado TINYINT(1) DEFAULT 0'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_preference_id VARCHAR(255)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_payment_id VARCHAR(255)'); } catch(e) {}
+    // Sembrar categorías iniciales si la tabla está vacía
+    const [catCount] = await conn.execute('SELECT COUNT(*) as c FROM categorias');
+    if (catCount[0].c === 0) {
+      const defaults = [
+        ['accion', 'Acción'],
+        ['retrato', 'Retrato'],
+        ['paisaje', 'Paisaje & Naturaleza'],
+        ['campeonato', 'Campeonato de Pesca'],
+      ];
+      for (const [slug, nombre] of defaults) {
+        try { await conn.execute('INSERT INTO categorias (slug, nombre) VALUES (?, ?)', [slug, nombre]); } catch(e) {}
+      }
+    }
     console.log('✓ Base de datos conectada y lista');
     await conn.end();
   } catch (err) {
@@ -98,6 +112,14 @@ async function initDB() {
 
 initDB();
 
+function slugify(str) {
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50);
+}
+
 app.get('/api/fotos', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
@@ -105,6 +127,55 @@ app.get('/api/fotos', async (req, res) => {
     await conn.end();
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.get('/api/categorias', async (req, res) => {
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT * FROM categorias ORDER BY nombre ASC');
+    await conn.end();
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: 'Error' }); }
+});
+
+app.post('/fs2026categoria-agregar', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const { nombre } = req.body;
+    if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre no puede estar vacío' });
+    const slug = slugify(nombre.trim());
+    if (!slug) return res.status(400).json({ error: 'Nombre inválido' });
+    const conn = await mysql.createConnection(dbConfig);
+    const [existing] = await conn.execute('SELECT id FROM categorias WHERE slug = ?', [slug]);
+    if (existing.length > 0) { await conn.end(); return res.status(400).json({ error: 'Esa categoría ya existe' }); }
+    await conn.execute('INSERT INTO categorias (slug, nombre) VALUES (?, ?)', [slug, nombre.trim()]);
+    await conn.end();
+    res.json({ ok: true, slug, nombre: nombre.trim() });
+  } catch (err) {
+    console.error('Error agregando categoría:', err.message);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+app.post('/fs2026categoria-eliminar/:id', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const [catRows] = await conn.execute('SELECT * FROM categorias WHERE id = ?', [req.params.id]);
+    if (catRows.length === 0) { await conn.end(); return res.status(404).json({ error: 'Categoría no encontrada' }); }
+    const cat = catRows[0];
+    const [enUso] = await conn.execute('SELECT COUNT(*) as c FROM fotos WHERE categoria = ?', [cat.slug]);
+    if (enUso[0].c > 0) {
+      await conn.end();
+      return res.status(400).json({ error: `No se puede eliminar: ${enUso[0].c} foto(s) usan esta categoría. Cambiá su categoría primero.` });
+    }
+    await conn.execute('DELETE FROM categorias WHERE id = ?', [req.params.id]);
+    await conn.end();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error eliminando categoría:', err.message);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
 });
 
 app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descarga'}]), async (req, res) => {
@@ -231,7 +302,6 @@ async function actualizarPedidoPorPago(paymentId) {
       }
     }
 
-    // Si el pago fue aprobado, mandar las fotos por email
     if (estado === 'exitoso' && pedidoActualizado) {
       try {
         const nombresFotos = pedidoActualizado.fotos.split(',').map(s => s.trim());
@@ -400,10 +470,14 @@ app.get('/fs2026fotos', async (req, res) => {
   try {
     const conn = await mysql.createConnection(dbConfig);
     const [fotos] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
+    const [categorias] = await conn.execute('SELECT * FROM categorias ORDER BY nombre ASC');
     await conn.end();
-    // fotos ya viene ordenado por fecha DESC, así que el índice+1 es el número correlativo (más nueva = #1)
     fotos.forEach((f, idx) => { f.displayNum = idx + 1; });
-    const CAT_LABELS = { accion: 'Acción', retrato: 'Retrato', paisaje: 'Paisaje & Naturaleza', campeonato: 'Campeonato de Pesca' };
+    const catMap = {};
+    categorias.forEach(c => { catMap[c.slug] = c.nombre; });
+    const catOptionsHTML = (selectedSlug) => categorias.map(c =>
+      `<option value="${c.slug}"${c.slug===selectedSlug?' selected':''}>${c.nombre}</option>`
+    ).join('');
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fotos — Foco Salvaje</title>
@@ -437,6 +511,18 @@ app.get('/fs2026fotos', async (req, res) => {
   .btn-subir{background:linear-gradient(135deg,#04342C,#1D9E75);color:white;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:24px;font-family:inherit;width:100%;transition:opacity 0.2s,transform 0.15s;letter-spacing:0.3px}
   .btn-subir:hover{opacity:0.92;transform:translateY(-1px)}
   .btn-subir:disabled{background:#9ca3af;cursor:not-allowed;transform:none}
+  .cat-manager{display:flex;gap:8px;align-items:flex-end;margin-top:6px}
+  .cat-manager input{flex:1;padding:9px 11px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none}
+  .cat-manager input:focus{border-color:#1D9E75}
+  .btn-cat-add{background:#04342C;color:white;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .btn-cat-add:hover{background:#0F6E56}
+  .cat-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .cat-chip{display:inline-flex;align-items:center;gap:6px;background:#e6f4ee;color:#0d7a52;padding:5px 8px 5px 12px;border-radius:20px;font-size:12.5px;font-weight:600}
+  .cat-chip button{background:none;border:none;color:#0d7a52;cursor:pointer;font-size:14px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:background 0.2s,color 0.2s}
+  .cat-chip button:hover{background:rgba(179,38,30,0.12);color:#b3261e}
+  .cat-msg{font-size:12px;margin-top:8px;display:none}
+  .cat-msg.ok{color:#0a6b46;display:block}
+  .cat-msg.err{color:#b3261e;display:block}
   .gallery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
   .gallery-title{font-size:16px;font-weight:700;color:#04342C}
   .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -471,7 +557,7 @@ app.get('/fs2026fotos', async (req, res) => {
   .btn-guardar:hover{background:#0F6E56}
   .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
   .btn-cancelar:hover{background:#d1d5db}
-  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.fotos-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px 12px 50px}.upload-card{padding:20px}}
+  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.fotos-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px 12px 50px}.upload-card{padding:20px}.cat-manager{flex-direction:column;align-items:stretch}}
   @media(max-width:420px){.fotos-grid{grid-template-columns:1fr}}
 </style></head>
 <body>
@@ -485,12 +571,25 @@ app.get('/fs2026fotos', async (req, res) => {
 </div>
 <div class="container">
   <div id="msg" class="msg"></div>
+
+  <div class="upload-card">
+    <div class="upload-title">🏷️ Categorías</div>
+    <div class="cat-manager">
+      <input type="text" id="catInput" placeholder="Ej: Vuelo de aves">
+      <button class="btn-cat-add" onclick="agregarCategoria()">+ Agregar categoría</button>
+    </div>
+    <div class="cat-msg" id="catMsg"></div>
+    <div class="cat-list" id="catList">
+      ${categorias.map(c => `<span class="cat-chip" id="catchip-${c.id}">${c.nombre}<button onclick="eliminarCategoria(${c.id})" title="Eliminar">✕</button></span>`).join('')}
+    </div>
+  </div>
+
   <div class="upload-card">
     <div class="upload-title">📷 Subir nueva foto</div>
     <form id="uploadForm">
       <div class="form-grid">
         <div class="fg"><label>Nombre de la foto</label><input type="text" name="nombre" placeholder="Ej: Juan Pérez - Lanzamiento" required></div>
-        <div class="fg"><label>Categoría</label><select name="categoria"><option value="accion">Acción</option><option value="retrato">Retrato</option><option value="paisaje">Paisaje & Naturaleza</option><option value="campeonato">Campeonato de Pesca</option></select></div>
+        <div class="fg"><label>Categoría</label><select name="categoria" id="uploadCatSelect">${catOptionsHTML(null)}</select></div>
       </div>
       <div class="form-grid" style="margin-top:18px">
         <div class="fg">
@@ -534,7 +633,7 @@ app.get('/fs2026fotos', async (req, res) => {
       <div class="foto-info">
         <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
         <div class="foto-meta-row">
-          <span class="foto-cat-pill" id="cat-${f.id}" data-cat="${f.categoria}">${CAT_LABELS[f.categoria] || f.categoria}</span>
+          <span class="foto-cat-pill" id="cat-${f.id}" data-cat="${f.categoria}">${catMap[f.categoria] || f.categoria}</span>
           <span class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</span>
         </div>
         <div class="btn-row">
@@ -545,12 +644,7 @@ app.get('/fs2026fotos', async (req, res) => {
       <div class="edit-form" id="edit-${f.id}">
         <div class="fg"><label>Nombre</label><input type="text" id="edit-nombre-${f.id}" value="${f.nombre}"></div>
         <div class="fg"><label>Categoría</label>
-          <select id="edit-cat-${f.id}">
-            <option value="accion" ${f.categoria==='accion'?'selected':''}>Acción</option>
-            <option value="retrato" ${f.categoria==='retrato'?'selected':''}>Retrato</option>
-            <option value="paisaje" ${f.categoria==='paisaje'?'selected':''}>Paisaje & Naturaleza</option>
-            <option value="campeonato" ${f.categoria==='campeonato'?'selected':''}>Campeonato de Pesca</option>
-          </select>
+          <select id="edit-cat-${f.id}" class="edit-cat-select">${catOptionsHTML(f.categoria)}</select>
         </div>
         <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}" min="1" step="1"></div>
         <div class="fg"><label>Descripción</label><input type="text" id="edit-desc-${f.id}" value="${f.descripcion || ''}" placeholder="Opcional"></div>
@@ -564,10 +658,64 @@ app.get('/fs2026fotos', async (req, res) => {
   </div>
 </div>
 <script>
-var CAT_LABELS = {accion:'Acción', retrato:'Retrato', paisaje:'Paisaje & Naturaleza', campeonato:'Campeonato de Pesca'};
+var CAT_MAP = ${JSON.stringify(catMap)};
+var CATEGORIAS = ${JSON.stringify(categorias)};
+
+function catOptionsHTML(selectedSlug){
+  return CATEGORIAS.map(function(c){
+    return '<option value="'+c.slug+'"'+(c.slug===selectedSlug?' selected':'')+'>'+c.nombre+'</option>';
+  }).join('');
+}
+
+async function agregarCategoria(){
+  const input=document.getElementById('catInput');
+  const nombre=input.value.trim();
+  const msgEl=document.getElementById('catMsg');
+  if(!nombre){
+    msgEl.className='cat-msg err';
+    msgEl.textContent='Escribí un nombre para la categoría';
+    return;
+  }
+  try{
+    const res=await fetch('/fs2026categoria-agregar',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nombre:nombre})
+    });
+    const data=await res.json();
+    if(data.ok){
+      msgEl.className='cat-msg ok';
+      msgEl.textContent='✓ Categoría agregada';
+      input.value='';
+      location.reload();
+    } else {
+      msgEl.className='cat-msg err';
+      msgEl.textContent=data.error||'No se pudo agregar';
+    }
+  } catch(e){
+    msgEl.className='cat-msg err';
+    msgEl.textContent='Error de conexión';
+  }
+}
+
+async function eliminarCategoria(id){
+  if(!confirm('¿Eliminar esta categoría?'))return;
+  try{
+    const res=await fetch('/fs2026categoria-eliminar/'+id,{method:'POST'});
+    const data=await res.json();
+    if(data.ok){
+      const chip=document.getElementById('catchip-'+id);
+      if(chip)chip.remove();
+    } else {
+      alert(data.error||'No se pudo eliminar');
+    }
+  } catch(e){
+    alert('Error de conexión');
+  }
+}
 
 function fotoCardHTML(f, displayNum) {
-  var catLabel = CAT_LABELS[f.categoria] || f.categoria;
+  var catLabel = CAT_MAP[f.categoria] || f.categoria;
   var html = '';
   html += '<div class="foto-card" id="foto-' + f.id + '">';
   html += '<div class="foto-img-wrap">';
@@ -588,12 +736,7 @@ function fotoCardHTML(f, displayNum) {
   html += '<div class="edit-form" id="edit-' + f.id + '">';
   html += '<div class="fg"><label>Nombre</label><input type="text" id="edit-nombre-' + f.id + '" value="' + f.nombre + '"></div>';
   html += '<div class="fg"><label>Categor\u00eda</label>';
-  html += '<select id="edit-cat-' + f.id + '">';
-  html += '<option value="accion"' + (f.categoria==='accion'?' selected':'') + '>Acci\u00f3n</option>';
-  html += '<option value="retrato"' + (f.categoria==='retrato'?' selected':'') + '>Retrato</option>';
-  html += '<option value="paisaje"' + (f.categoria==='paisaje'?' selected':'') + '>Paisaje & Naturaleza</option>';
-  html += '<option value="campeonato"' + (f.categoria==='campeonato'?' selected':'') + '>Campeonato de Pesca</option>';
-  html += '</select>';
+  html += '<select id="edit-cat-' + f.id + '" class="edit-cat-select">' + catOptionsHTML(f.categoria) + '</select>';
   html += '</div>';
   html += '<div class="fg"><label>Precio</label><input type="number" id="edit-precio-' + f.id + '" value="' + f.precio + '" min="1" step="1"></div>';
   html += '<div class="fg"><label>Descripci\u00f3n</label><input type="text" id="edit-desc-' + f.id + '" value="' + (f.descripcion || '') + '" placeholder="Opcional"></div>';
@@ -615,7 +758,6 @@ function refrescarGaleria() {
       if (fotos.length === 0) {
         cont.innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
       } else {
-        // /api/fotos viene ordenado por fecha DESC, así que el índice+1 es el número correlativo
         var gridHtml = '<div class="fotos-grid">';
         for (var i = 0; i < fotos.length; i++) {
           gridHtml += fotoCardHTML(fotos[i], i + 1);
@@ -729,7 +871,7 @@ function guardarEdit(id){
       if(data.ok){
         document.getElementById('nombre-'+id).textContent=nombre;
         const catEl=document.getElementById('cat-'+id);
-        catEl.textContent=CAT_LABELS[categoria]||categoria;
+        catEl.textContent=CAT_MAP[categoria]||categoria;
         catEl.dataset.cat=categoria;
         document.getElementById('precio-'+id).textContent='$ '+parseFloat(precio).toLocaleString('es-AR');
         toggleEdit(id);
@@ -749,7 +891,6 @@ app.get('/fs2026pedidos', async (req, res) => {
     const conn = await mysql.createConnection(dbConfig);
     const [rows] = await conn.execute('SELECT * FROM pedidos ORDER BY fecha DESC');
     await conn.end();
-    // El pedido más viejo es #1, sin importar el orden de visualización (DESC)
     const sortedAsc = [...rows].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
     const numPorId = {};
     sortedAsc.forEach((r, idx) => { numPorId[r.id] = idx + 1; });

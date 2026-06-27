@@ -68,6 +68,80 @@ async function enviarEmail({ to, subject, html }) {
   }
 }
 
+const LOGO_URL = `${process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:8080'}/assets/logo.jpg`;
+
+function emailFotosHTML({ nombreComprador, fotos }) {
+  const fotosHtml = fotos.map(f => `
+    <tr>
+      <td style="padding:0 0 24px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f9f8;border-radius:10px;overflow:hidden;border:1px solid #e8ece9;">
+          <tr>
+            <td style="padding:0;">
+              <a href="${f.url_descarga}" target="_blank" style="text-decoration:none;display:block;">
+                <img src="${f.url_galeria}" alt="${f.nombre}" width="100%" style="display:block;width:100%;max-height:340px;object-fit:cover;border-bottom:1px solid #e8ece9;">
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 20px 20px;">
+              <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#04342C;font-family:Georgia,'Times New Roman',serif;">${f.nombre}</p>
+              <p style="margin:0 0 14px;font-size:13px;color:#5C5C58;font-family:Arial,sans-serif;">Tocá la imagen o el botón para descargarla en alta resolución, sin marca de agua.</p>
+              <a href="${f.url_descarga}" target="_blank" style="display:inline-block;background:#1D9E75;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-size:13px;font-weight:700;padding:11px 22px;border-radius:6px;">⬇ Descargar esta foto</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#eef1ef;font-family:Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1ef;padding:32px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(4,52,44,0.08);">
+          <tr>
+            <td style="background:linear-gradient(135deg,#04342C,#0F6E56);padding:32px 28px;text-align:center;">
+              <img src="${LOGO_URL}" alt="Foco Salvaje" width="64" height="64" style="border-radius:50%;display:block;margin:0 auto 12px;border:2px solid rgba(255,255,255,0.4);object-fit:cover;">
+              <p style="margin:0;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;">Foco Salvaje</p>
+              <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Fotografía Profesional</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 28px 8px;">
+              <p style="margin:0 0 6px;font-size:21px;font-weight:700;color:#04342C;font-family:Georgia,'Times New Roman',serif;">¡Gracias por tu compra, ${nombreComprador}!</p>
+              <p style="margin:0 0 28px;font-size:14px;color:#5C5C58;line-height:1.6;">
+                Tu pago fue confirmado. Abajo encontrás ${fotos.length === 1 ? 'tu foto' : 'tus fotos'} en alta resolución y sin marca de agua.
+                Hacé click en cada imagen o en el botón verde para descargarla a tu dispositivo.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                ${fotosHtml}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 28px 32px;border-top:1px solid #eef1ef;">
+              <p style="margin:20px 0 0;font-size:13px;color:#9C9C94;line-height:1.6;text-align:center;">
+                ¿Algún problema con la descarga o alguna consulta?<br>
+                Escribinos a <a href="mailto:focosalvajeph@gmail.com" style="color:#1D9E75;text-decoration:none;font-weight:600;">focosalvajeph@gmail.com</a>
+                o por <a href="https://wa.me/5492613036313" style="color:#1D9E75;text-decoration:none;font-weight:600;">WhatsApp</a>.
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:20px 0 0;font-size:11px;color:#9C9C94;">© 2026 Foco Salvaje — Carrizal, Mendoza</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : 'http://localhost:8080';
@@ -308,13 +382,7 @@ async function actualizarPedidoPorPago(paymentId) {
         const placeholders = nombresFotos.map(() => '?').join(',');
         const [fotosRows] = await conn.execute(`SELECT * FROM fotos WHERE nombre IN (${placeholders})`, nombresFotos);
         if (fotosRows.length > 0) {
-          const linksHtml = fotosRows.map(f => `<li><a href="${f.url_descarga}" target="_blank">${f.nombre}</a></li>`).join('');
-          const html = `
-            <h2>¡Gracias por tu compra en Foco Salvaje!</h2>
-            <p>Hola ${pedidoActualizado.nombre}, tu pago fue confirmado. Acá tenés los links de descarga de tus fotos en alta resolución:</p>
-            <ul>${linksHtml}</ul>
-            <p>Cualquier consulta, escribinos a focosalvajeph@gmail.com</p>
-          `;
+          const html = emailFotosHTML({ nombreComprador: pedidoActualizado.nombre, fotos: fotosRows });
           await enviarEmail({ to: pedidoActualizado.email, subject: '¡Tus fotos de Foco Salvaje están listas!', html });
         }
       } catch (mailErr) {
@@ -389,13 +457,7 @@ app.post('/fs2026reenviar/:id', async (req, res) => {
     const placeholders = nombresFotos.map(() => '?').join(',');
     const [fotosRows] = await conn.execute(`SELECT * FROM fotos WHERE nombre IN (${placeholders})`, nombresFotos);
     if (fotosRows.length === 0) { await conn.end(); return res.status(404).json({ error: 'No se encontraron las fotos de este pedido' }); }
-    const linksHtml = fotosRows.map(f => `<li><a href="${f.url_descarga}" target="_blank">${f.nombre}</a></li>`).join('');
-    const html = `
-      <h2>¡Gracias por tu compra en Foco Salvaje!</h2>
-      <p>Hola ${pedido.nombre}, acá tenés los links de descarga de tus fotos en alta resolución:</p>
-      <ul>${linksHtml}</ul>
-      <p>Cualquier consulta, escribinos a focosalvajeph@gmail.com</p>
-    `;
+    const html = emailFotosHTML({ nombreComprador: pedido.nombre, fotos: fotosRows });
     const enviado = await enviarEmail({ to: pedido.email, subject: '¡Tus fotos de Foco Salvaje están listas!', html });
     if (enviado) {
       await conn.execute('UPDATE pedidos SET estado = "exitoso" WHERE id = ?', [req.params.id]);

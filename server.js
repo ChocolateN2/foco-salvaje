@@ -209,7 +209,6 @@ async function actualizarPedidoPorPago(paymentId) {
     console.log('Payment status:', paymentInfo.status, '| email:', paymentInfo.payer?.email);
     let estado = 'pendiente';
     if (paymentInfo.status === 'approved') estado = 'exitoso';
-    if (paymentInfo.status === 'rejected') estado = 'fallido';
     const conn = await mysql.createConnection(dbConfig);
     let pedidoActualizado = null;
     if (paymentInfo.preference_id) {
@@ -740,6 +739,8 @@ app.get('/fs2026pedidos', async (req, res) => {
     const conn = await mysql.createConnection(dbConfig);
     const [rows] = await conn.execute('SELECT * FROM pedidos ORDER BY fecha DESC');
     await conn.end();
+    // rows viene ordenado por fecha DESC; el más nuevo es #1, sin huecos al borrar
+    rows.forEach((r, idx) => { r.displayNum = idx + 1; });
     const PER_PAGE = 20;
     const page = parseInt(req.query.page) || 1;
     const busqueda = req.query.q || '';
@@ -801,7 +802,6 @@ app.get('/fs2026pedidos', async (req, res) => {
   .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block}
   .badge.pendiente{background:#fef3c7;color:#d97706}
   .badge.exitoso{background:#d1fae5;color:#065f46}
-  .badge.fallido{background:#fee2e2;color:#991b1b}
   .btn-entregar{border:none;padding:6px 13px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:600;transition:all 0.2s}
   .btn-entregar.no{background:#f3f4f6;color:#6b7280}
   .btn-entregar.no:hover{background:#04342C;color:white}
@@ -832,7 +832,7 @@ app.get('/fs2026pedidos', async (req, res) => {
     <div class="filters-title">🔍 Filtros</div>
     <form method="get" action="/fs2026pedidos">
       <div class="fg"><label>Buscar</label><input type="text" name="q" value="${busqueda}" placeholder="Nombre o email..."></div>
-      <div class="fg"><label>Estado</label><select name="estado"><option value="">Todos</option><option value="pendiente" ${filtroEstado==='pendiente'?'selected':''}>Pendiente</option><option value="exitoso" ${filtroEstado==='exitoso'?'selected':''}>Exitoso</option><option value="fallido" ${filtroEstado==='fallido'?'selected':''}>Fallido</option></select></div>
+      <div class="fg"><label>Estado</label><select name="estado"><option value="">Todos</option><option value="pendiente" ${filtroEstado==='pendiente'?'selected':''}>Pendiente</option><option value="exitoso" ${filtroEstado==='exitoso'?'selected':''}>Exitoso</option></select></div>
       <div class="fg"><label>Entregado</label><select name="entregado"><option value="">Todos</option><option value="0" ${filtroEntregado==='0'?'selected':''}>No entregado</option><option value="1" ${filtroEntregado==='1'?'selected':''}>Entregado</option></select></div>
       <div class="fg"><label>Fecha</label><input type="date" name="fecha" value="${filtroFecha}"></div>
       <button class="btn-filter" type="submit">Filtrar</button>
@@ -850,7 +850,7 @@ app.get('/fs2026pedidos', async (req, res) => {
         <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th><th></th><th></th></tr></thead>
         <tbody>
           ${paginated.map(r => `<tr id="pedido-${r.id}">
-            <td><strong>${r.id}</strong></td>
+            <td><strong>${r.displayNum}</strong></td>
             <td>${r.nombre}</td>
             <td><span id="email-${r.id}">${r.email}</span> <button onclick="toggleEmailEdit(${r.id})" style="border:none;background:none;cursor:pointer;font-size:11px;color:#1d5e8c;">✏️</button>
               <div id="email-edit-${r.id}" style="display:none;margin-top:6px">

@@ -20,9 +20,21 @@ let lbList=[],lbCurrent=0,cart=[];
 function cam(w){return `<svg fill="none" stroke="white" stroke-width="1" viewBox="0 0 24 24" width="${w}" height="${w}"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>`;}
 
 let CAT_LABELS = {};
+const CAT_COLOR_CACHE = {};
 
 function catLabel(cat){
-  return CAT_LABELS[cat] || (cat.charAt(0).toUpperCase()+cat.slice(1));
+  return CAT_LABELS[cat] || (cat ? cat.charAt(0).toUpperCase()+cat.slice(1) : '');
+}
+
+function catColor(cat){
+  if (CAT_COLOR_CACHE[cat]) return CAT_COLOR_CACHE[cat];
+  let hash = 0;
+  const str = String(cat || '');
+  for (let i = 0; i < str.length; i++) { hash = (hash * 31 + str.charCodeAt(i)) % 360; }
+  const hue = Math.abs(hash) % 360;
+  const color = { bg: `hsla(${hue}, 70%, 88%, 0.6)`, text: `hsl(${hue}, 55%, 32%)` };
+  CAT_COLOR_CACHE[cat] = color;
+  return color;
 }
 
 async function loadCategorias(){
@@ -78,7 +90,9 @@ function renderGrid(list){
     document.getElementById('galleryGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:48px;color:#9C9C94">No hay fotos disponibles todavía</div>';
     return;
   }
-  document.getElementById('galleryGrid').innerHTML=list.map(p=>`
+  document.getElementById('galleryGrid').innerHTML=list.map(p=>{
+    const c = catColor(p.cat);
+    return `
     <div class="photo-card">
       <div class="photo-thumb-wrap" onclick="openLB(${p.id})" style="cursor:pointer">
         <img src="${p.img}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
@@ -88,13 +102,14 @@ function renderGrid(list){
         <div class="photo-name">${p.name}</div>
         <div class="photo-bottom">
           <div>
-            <span class="photo-cat-badge ${p.cat}">${catLabel(p.cat)}</span>
+            <span class="photo-cat-badge" style="background:${c.bg};color:${c.text}">${catLabel(p.cat)}</span>
             <div class="photo-price-tag">$ ${p.price.toLocaleString('es-AR')}</div>
           </div>
           <button class="add-cart-btn" onclick="addPhoto(${p.id})">+ Agregar</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function filterPhotos(cat,btn){

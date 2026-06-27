@@ -138,6 +138,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 #page-carrito.active{display:block}
 .cart-page-inner{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
 .cart-page-head{margin-bottom:4px}
+.cart-back-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--v2);font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;padding:0;margin-bottom:14px;transition:color 0.2s}
+.cart-back-btn:hover{color:var(--v0)}
 .cart-subtitle{font-size:13px;color:var(--txt3);margin-top:4px}
 .cart-page-body{background:white;border-radius:8px;box-shadow:0 2px 12px rgba(4,52,44,0.06);padding:8px 28px;min-height:120px}
 .cart-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 24px;text-align:center}

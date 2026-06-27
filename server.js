@@ -84,7 +84,8 @@ async function initDB() {
   try {
     const conn = await mysql.createConnection(dbConfig);
     await conn.execute(`CREATE TABLE IF NOT EXISTS pedidos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, fotos TEXT NOT NULL, total DECIMAL(10,2) NOT NULL, estado VARCHAR(50) DEFAULT 'pendiente', entregado TINYINT(1) DEFAULT 0, mp_preference_id VARCHAR(255), mp_payment_id VARCHAR(255), fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
-    await conn.execute(`CREATE TABLE IF NOT EXISTS fotos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, categoria VARCHAR(50) DEFAULT 'accion', precio DECIMAL(10,2) NOT NULL, url_galeria VARCHAR(500) NOT NULL, url_descarga VARCHAR(500) NOT NULL, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS fotos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, categoria VARCHAR(50) DEFAULT 'accion', precio DECIMAL(10,2) NOT NULL, url_galeria VARCHAR(500) NOT NULL, url_descarga VARCHAR(500) NOT NULL, descripcion TEXT, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    try { await conn.execute('ALTER TABLE fotos ADD COLUMN descripcion TEXT'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN entregado TINYINT(1) DEFAULT 0'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_preference_id VARCHAR(255)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_payment_id VARCHAR(255)'); } catch(e) {}
@@ -109,7 +110,7 @@ app.get('/api/fotos', async (req, res) => {
 app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descarga'}]), async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
-    const { nombre, categoria, precio } = req.body;
+    const { nombre, categoria, precio, descripcion } = req.body;
     if (!nombre || !categoria || !precio || parseFloat(precio) <= 0 || !req.files?.foto_galeria || !req.files?.foto_descarga)
       return res.status(400).json({ error: 'Faltan datos o el precio no es válido' });
     const galResult = await new Promise((resolve, reject) => {
@@ -119,7 +120,7 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
       cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_descarga[0].buffer);
     });
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga) VALUES (?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url]);
+    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion) VALUES (?, ?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null]);
     await conn.end();
     res.json({ ok: true });
   } catch (err) {
@@ -131,10 +132,10 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
 app.post('/fs2026editar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
-    const { nombre, categoria, precio } = req.body;
+    const { nombre, categoria, precio, descripcion } = req.body;
     if (!nombre || !categoria || !precio || parseFloat(precio) <= 0) return res.status(400).json({ error: 'Datos inválidos' });
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute('UPDATE fotos SET nombre = ?, categoria = ?, precio = ? WHERE id = ?', [nombre, categoria, parseFloat(precio), req.params.id]);
+    await conn.execute('UPDATE fotos SET nombre = ?, categoria = ?, precio = ?, descripcion = ? WHERE id = ?', [nombre, categoria, parseFloat(precio), descripcion || null, req.params.id]);
     await conn.end();
     res.json({ ok: true });
   } catch (err) {
@@ -500,6 +501,12 @@ app.get('/fs2026fotos', async (req, res) => {
         <div></div>
       </div>
       <div class="form-grid" style="margin-top:18px">
+        <div class="fg" style="grid-column:1/-1">
+          <label>Descripción (opcional)</label>
+          <input type="text" name="descripcion" placeholder="Ej: Tomada al amanecer en la costa del río">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:18px">
         <div class="fg">
           <label>Foto con marca de agua (galería)</label>
           <div class="file-input-wrap" id="wrap1"><input type="file" name="foto_galeria" accept="image/*" onchange="showPreview(this,'name1','prev1','wrap1')" required><img class="file-preview-img" id="prev1"><div class="file-icon" id="icon1">🖼️</div><div class="file-label" id="label1">Tocá para elegir la foto</div><div class="file-sublabel">Se muestra en la galería</div><div class="file-name" id="name1"></div></div>
@@ -546,6 +553,7 @@ app.get('/fs2026fotos', async (req, res) => {
           </select>
         </div>
         <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}" min="1" step="1"></div>
+        <div class="fg"><label>Descripción</label><input type="text" id="edit-desc-${f.id}" value="${f.descripcion || ''}" placeholder="Opcional"></div>
         <div class="edit-actions">
           <button class="btn-guardar" onclick="guardarEdit(${f.id})">Guardar</button>
           <button class="btn-cancelar" onclick="toggleEdit(${f.id})">Cancelar</button>
@@ -588,6 +596,7 @@ function fotoCardHTML(f, displayNum) {
   html += '</select>';
   html += '</div>';
   html += '<div class="fg"><label>Precio</label><input type="number" id="edit-precio-' + f.id + '" value="' + f.precio + '" min="1" step="1"></div>';
+  html += '<div class="fg"><label>Descripci\u00f3n</label><input type="text" id="edit-desc-' + f.id + '" value="' + (f.descripcion || '') + '" placeholder="Opcional"></div>';
   html += '<div class="edit-actions">';
   html += '<button class="btn-guardar" onclick="guardarEdit(' + f.id + ')">Guardar</button>';
   html += '<button class="btn-cancelar" onclick="toggleEdit(' + f.id + ')">Cancelar</button>';
@@ -707,12 +716,13 @@ function guardarEdit(id){
   const nombre=document.getElementById('edit-nombre-'+id).value.trim();
   const categoria=document.getElementById('edit-cat-'+id).value;
   const precio=document.getElementById('edit-precio-'+id).value;
+  const descripcion=document.getElementById('edit-desc-'+id).value.trim();
   if(!nombre){alert('El nombre no puede estar vacío');return;}
   if(!precio || parseFloat(precio) <= 0){alert('El precio debe ser mayor a $0');return;}
   fetch('/fs2026editar/'+id,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({nombre:nombre,categoria:categoria,precio:precio})
+    body:JSON.stringify({nombre:nombre,categoria:categoria,precio:precio,descripcion:descripcion})
   })
     .then(function(res){ return res.json(); })
     .then(function(data){

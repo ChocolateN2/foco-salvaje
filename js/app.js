@@ -55,6 +55,7 @@ async function loadPhotos(){
       price: parseFloat(f.precio),
       img: f.url_galeria,
       url_descarga: f.url_descarga,
+      desc: f.descripcion || '',
     }));
     lbList = [...photos];
     renderFilters();
@@ -106,7 +107,10 @@ function updateLB(){
   document.getElementById('lbNum').textContent='#'+String(p.displayNum).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
   document.getElementById('lbName').textContent=p.name;
   document.getElementById('lbCat').textContent=catLabel(p.cat);
-  document.getElementById('lbPrice').textContent='$ '+p.price.toLocaleString('es-AR');
+  const descEl=document.getElementById('lbDesc');
+  descEl.textContent=p.desc||'';
+  descEl.style.display=p.desc?'block':'none';
+  document.getElementById('lbPrice').textContent=p.price.toLocaleString('es-AR');
   document.getElementById('lbAdd').onclick=()=>addPhoto(p.id);
 }
 document.addEventListener('keydown',e=>{

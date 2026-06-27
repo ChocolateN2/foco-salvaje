@@ -1,4 +1,4 @@
-const pages=['inicio','galeria','contacto'];
+const pages=['inicio','galeria','contacto','carrito'];
 let current='inicio';
 
 function goTo(name){
@@ -143,7 +143,7 @@ function updateCartUI(){
         </div>
         <div class="cart-empty-title">Tu carrito está vacío</div>
         <div class="cart-empty-desc">Agregá fotos desde la galería</div>
-        <button class="cart-empty-btn" onclick="toggleCart();goTo('galeria')">Ver galería</button>
+        <button class="cart-empty-btn" onclick="goTo('galeria')">Ver galería</button>
       </div>`;
   } else {
     foot.style.display='block';
@@ -210,7 +210,6 @@ async function checkout(){
   }
 }
 
-function toggleCart(){document.getElementById('cartModal').classList.toggle('open');}
 function showToast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 
 async function enviarContacto(){

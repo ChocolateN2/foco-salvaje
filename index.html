@@ -26,7 +26,7 @@
     <button class="nav-btn active" id="nav-inicio" onclick="goTo('inicio')">Inicio</button>
     <button class="nav-btn" id="nav-galeria" onclick="goTo('galeria')">Galería</button>
     <button class="nav-btn" id="nav-contacto" onclick="goTo('contacto')">Contacto</button>
-    <button class="cart-btn" onclick="toggleCart()">
+    <button class="cart-btn" onclick="goTo('carrito')">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
       Carrito <div class="cart-count" id="cartCount">0</div>
     </button>
@@ -134,29 +134,27 @@
   </div>
 </div>
 
-<!-- CART -->
-<div class="cart-modal" id="cartModal" onclick="if(event.target===this)toggleCart()">
-  <div class="cart-panel">
-    <div class="cart-head">
+<!-- CARRITO (página completa) -->
+<div class="page" id="page-carrito">
+  <div class="cart-page-inner">
+    <div class="cart-page-head">
       <div>
-        <div class="cart-title">Tu carrito</div>
+        <div class="sec-label">Resumen</div>
+        <div class="sec-title">Tu carrito</div>
         <div class="cart-subtitle" id="cartSubtitle">0 fotos seleccionadas</div>
       </div>
-      <button class="cart-close" onclick="toggleCart()">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
     </div>
-    <div class="cart-body" id="cartBody">
+    <div class="cart-page-body" id="cartBody">
       <div class="cart-empty-state">
         <div class="cart-empty-icon">
           <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
         </div>
         <div class="cart-empty-title">Tu carrito está vacío</div>
         <div class="cart-empty-desc">Agregá fotos desde la galería</div>
-        <button class="cart-empty-btn" onclick="toggleCart();goTo('galeria')">Ver galería</button>
+        <button class="cart-empty-btn" onclick="goTo('galeria')">Ver galería</button>
       </div>
     </div>
-    <div class="cart-foot" id="cartFoot" style="display:none">
+    <div class="cart-page-foot" id="cartFoot" style="display:none">
       <div class="cart-buyer-form">
         <div class="cart-buyer-title">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

@@ -854,14 +854,14 @@ app.get('/fs2026pedidos', async (req, res) => {
         <tbody>
           ${paginated.map(r => `<tr id="pedido-${r.id}">
             <td><strong>${r.displayNum}</strong></td>
-            <td>${r.nombre}</td>
+            <td style="max-width:160px;white-space:normal;word-break:break-word">${r.nombre}</td>
             <td><span id="email-${r.id}">${r.email}</span> <button onclick="toggleEmailEdit(${r.id})" style="border:none;background:none;cursor:pointer;font-size:11px;color:#1d5e8c;">✏️</button>
               <div id="email-edit-${r.id}" style="display:none;margin-top:6px">
                 <input type="email" id="email-input-${r.id}" value="${r.email}" style="font-size:12px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;width:160px">
                 <button onclick="guardarEmail(${r.id})" style="border:none;background:#04342C;color:white;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:11px;">OK</button>
               </div>
             </td>
-            <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.fotos}</td>
+            <td style="max-width:260px;white-space:normal;word-break:break-word;line-height:1.4">${r.fotos}</td>
             <td><strong>$ ${parseFloat(r.total).toLocaleString('es-AR')}</strong></td>
             <td><span class="badge ${r.estado}">${r.estado}</span></td>
             <td><button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button></td>

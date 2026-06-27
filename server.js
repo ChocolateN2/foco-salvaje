@@ -739,8 +739,11 @@ app.get('/fs2026pedidos', async (req, res) => {
     const conn = await mysql.createConnection(dbConfig);
     const [rows] = await conn.execute('SELECT * FROM pedidos ORDER BY fecha DESC');
     await conn.end();
-    // rows viene ordenado por fecha DESC; el más nuevo es #1, sin huecos al borrar
-    rows.forEach((r, idx) => { r.displayNum = idx + 1; });
+    // El pedido más viejo es #1, sin importar el orden de visualización (DESC)
+    const sortedAsc = [...rows].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const numPorId = {};
+    sortedAsc.forEach((r, idx) => { numPorId[r.id] = idx + 1; });
+    rows.forEach(r => { r.displayNum = numPorId[r.id]; });
     const PER_PAGE = 20;
     const page = parseInt(req.query.page) || 1;
     const busqueda = req.query.q || '';

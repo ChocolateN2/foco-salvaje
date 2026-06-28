@@ -638,18 +638,14 @@ app.get('/fs2026fotos', async (req, res) => {
   if (!req.session.admin) return res.redirect('/fs2026admin');
   try {
     const conn = await mysql.createConnection(dbConfig);
-    const [fotos] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
     const [categorias] = await conn.execute('SELECT * FROM categorias ORDER BY nombre ASC');
     await conn.end();
-    fotos.forEach((f, idx) => { f.displayNum = idx + 1; });
-    const catMap = {};
-    categorias.forEach(c => { catMap[c.slug] = c.nombre; });
     const catOptionsHTML = (selectedSlug) => categorias.map(c =>
       `<option value="${c.slug}"${c.slug===selectedSlug?' selected':''}>${c.nombre}</option>`
     ).join('');
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fotos — Foco Salvaje</title>
+<title>Subir fotos — Foco Salvaje</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937}
@@ -698,57 +694,17 @@ app.get('/fs2026fotos', async (req, res) => {
   .cat-msg{font-size:12px;margin-top:8px;display:none}
   .cat-msg.ok{color:#0a6b46;display:block}
   .cat-msg.err{color:#b3261e;display:block}
-  .gallery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-  .gallery-title{font-size:16px;font-weight:700;color:#04342C}
-  .filters-card{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:white;border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #eef1f0}
-  .filters-input{flex:1;min-width:180px;padding:9px 12px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:border 0.2s}
-  .filters-input:focus{border-color:#1D9E75}
-  .filters-select{padding:9px 10px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:white;min-width:140px}
-  .filters-select:focus{border-color:#1D9E75}
-  .filters-clear{background:#f3f4f6;color:#6b7280;border:none;padding:9px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background 0.2s}
-  .filters-clear:hover{background:#e5e7eb}
-  .filters-results{font-size:12.5px;color:#6b7280;margin-bottom:14px}
-  .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .foto-card{background:white;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(4,52,44,0.07);border:1px solid #eef1f0;transition:box-shadow 0.2s}
-  .foto-card:hover{box-shadow:0 6px 20px rgba(4,52,44,0.12)}
-  .foto-img-wrap{position:relative;aspect-ratio:4/3;overflow:hidden;background:#f1f3f2}
-  .foto-img{width:100%;height:100%;object-fit:cover;display:block}
-  .foto-id-badge{position:absolute;top:8px;left:8px;background:rgba(4,52,44,0.75);color:white;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:0.5px;backdrop-filter:blur(4px)}
-  .foto-info{padding:14px}
-  .foto-nombre{font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;line-height:1.3}
-  .foto-etiqueta{font-size:11px;color:#0d7a52;font-weight:600;margin-bottom:6px}
-  .foto-meta-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-  .foto-cat-pill{font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:#e6f4ee;color:#0d7a52}
-  .foto-precio{font-size:15px;font-weight:800;color:#04342C}
-  .btn-row{display:flex;gap:8px}
-  .btn-editar{flex:1;background:#eaf3fb;color:#1d5e8c;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.2s}
-  .btn-editar:hover{background:#d4e9f9}
-  .btn-eliminar{flex:1;background:#fdecec;color:#b3261e;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.2s}
-  .btn-eliminar:hover{background:#fbd5d5}
-  .empty{text-align:center;padding:56px 24px;color:#9ca3af;background:white;border-radius:16px;border:1px solid #eef1f0}
-  .empty-icon{font-size:40px;margin-bottom:10px}
   .msg{padding:13px 18px;border-radius:10px;font-size:13.5px;margin-bottom:18px;display:none;font-weight:500}
   .msg.ok{background:#e3f7ee;color:#0a6b46;display:block;border:1px solid #b9e8d2}
   .msg.err{background:#fdecec;color:#b3261e;display:block;border:1px solid #f8c9c9}
-  .edit-form{display:none;padding:16px;background:#f8fafc;border-top:1px solid #eef1f0}
-  .edit-form.open{display:block;animation:slideDown 0.2s ease}
-  @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-  .edit-form .fg{margin-bottom:10px}
-  .edit-form input,.edit-form select{padding:8px 10px;font-size:12.5px;border:1.5px solid #e2e5e9;border-radius:8px;width:100%;font-family:inherit;outline:none}
-  .edit-form input:focus,.edit-form select:focus{border-color:#1D9E75}
-  .edit-actions{display:flex;gap:8px;margin-top:10px}
-  .btn-guardar{flex:1;background:#04342C;color:white;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
-  .btn-guardar:hover{background:#0F6E56}
-  .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
-  .btn-cancelar:hover{background:#d1d5db}
-  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.fotos-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px 12px 50px}.upload-card{padding:20px}.cat-manager{flex-direction:column;align-items:stretch}}
-  @media(max-width:420px){.fotos-grid{grid-template-columns:1fr}}
+  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.container{padding:16px 12px 50px}.upload-card{padding:20px}.cat-manager{flex-direction:column;align-items:stretch}}
 </style></head>
 <body>
 <div class="navbar">
   <div class="navbar-brand">🎣 Foco Salvaje</div>
   <div class="navbar-links">
-    <a class="nav-link active" href="/fs2026fotos">📷 Fotos</a>
+    <a class="nav-link active" href="/fs2026fotos">📤 Subir fotos</a>
+    <a class="nav-link" href="/fs2026galeria">🖼️ Galería</a>
     <a class="nav-link" href="/fs2026pedidos">📋 Pedidos</a>
     <a class="nav-link" href="/fs2026logout">Salir</a>
   </div>
@@ -847,71 +803,8 @@ app.get('/fs2026fotos', async (req, res) => {
       <button class="btn-subir" type="submit" id="btnSubirMulti">Subir todas las fotos</button>
     </form>
   </div>
-
-  <div class="gallery-header">
-    <div class="gallery-title" id="galleryTitle">Fotos en la galería (${fotos.length})</div>
-  </div>
-
-  <div class="filters-card" id="filtersCard" style="display:${fotos.length === 0 ? 'none' : 'flex'}">
-    <input type="text" id="fotosBuscar" class="filters-input" placeholder="🔍 Buscar por nombre..." oninput="aplicarFiltrosFotos()">
-    <select id="fotosFiltroCat" class="filters-select" onchange="aplicarFiltrosFotos()">
-      <option value="">Todas las categorías</option>
-      ${catOptionsHTML(null)}
-    </select>
-    <select id="fotosFiltroEtq" class="filters-select" onchange="aplicarFiltrosFotos()">
-      <option value="">Todas las etiquetas</option>
-    </select>
-    <button class="filters-clear" onclick="limpiarFiltrosFotos()">✕ Limpiar</button>
-  </div>
-  <div class="filters-results" id="fotosFiltroResultados" style="display:none"></div>
-  <div id="fotosContainer">
-  ${fotos.length === 0 ? '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>' : `
-  <div class="fotos-grid">
-    ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}" data-nombre="${f.nombre.toLowerCase().replace(/"/g,'')}" data-cat="${f.categoria}" data-etq="${(f.etiqueta || '').toLowerCase().replace(/"/g,'')}">
-      <div class="foto-img-wrap">
-        <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
-        <div class="foto-id-badge">#${String(f.displayNum).padStart(3,'0')}</div>
-      </div>
-      <div class="foto-info">
-        <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
-        ${f.etiqueta ? `<div class="foto-etiqueta" id="etq-${f.id}">🏷 ${f.etiqueta}</div>` : `<div class="foto-etiqueta" id="etq-${f.id}" style="display:none"></div>`}
-        <div class="foto-meta-row">
-          <span class="foto-cat-pill" id="cat-${f.id}" data-cat="${f.categoria}">${catMap[f.categoria] || f.categoria}</span>
-          <span class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</span>
-        </div>
-        <div class="btn-row">
-          <button class="btn-editar" onclick="toggleEdit(${f.id})">✏️ Editar</button>
-          <button class="btn-eliminar" onclick="eliminarFoto(${f.id})">🗑 Eliminar</button>
-        </div>
-      </div>
-      <div class="edit-form" id="edit-${f.id}">
-        <div class="fg"><label>Nombre</label><input type="text" id="edit-nombre-${f.id}" value="${f.nombre}"></div>
-        <div class="fg"><label>Categoría</label>
-          <select id="edit-cat-${f.id}" class="edit-cat-select">${catOptionsHTML(f.categoria)}</select>
-        </div>
-        <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}" min="1" step="1"></div>
-        <div class="fg"><label>Etiqueta</label><input type="text" id="edit-etq-${f.id}" value="${f.etiqueta || ''}" placeholder="Ej: Corredor 22"></div>
-        <div class="fg"><label>Descripción</label><input type="text" id="edit-desc-${f.id}" value="${f.descripcion || ''}" placeholder="Opcional"></div>
-        <div class="edit-actions">
-          <button class="btn-guardar" onclick="guardarEdit(${f.id})">Guardar</button>
-          <button class="btn-cancelar" onclick="toggleEdit(${f.id})">Cancelar</button>
-        </div>
-      </div>
-    </div>`).join('')}
-  </div>`}
-  </div>
 </div>
 <script>
-var CAT_MAP = ${JSON.stringify(catMap)};
-var CATEGORIAS = ${JSON.stringify(categorias)};
-poblarFiltroEtiquetasDesdeCards();
-
-function catOptionsHTML(selectedSlug){
-  return CATEGORIAS.map(function(c){
-    return '<option value="'+c.slug+'"'+(c.slug===selectedSlug?' selected':'')+'>'+c.nombre+'</option>';
-  }).join('');
-}
-
 async function agregarCategoria(){
   const input=document.getElementById('catInput');
   const nombre=input.value.trim();
@@ -957,6 +850,296 @@ async function eliminarCategoria(id){
   } catch(e){
     alert('Error de conexión');
   }
+}
+
+function showPreview(input,nameId,prevId,wrapId){
+  const file=input.files[0];
+  document.getElementById(nameId).textContent=file?file.name:'';
+  const img=document.getElementById(prevId);
+  const wrap=document.getElementById(wrapId);
+  if(file){
+    const reader=new FileReader();
+    reader.onload=function(e){
+      img.src=e.target.result;
+      img.style.display='block';
+      wrap.classList.add('has-preview');
+    };
+    reader.readAsDataURL(file);
+  } else {
+    img.style.display='none';
+    wrap.classList.remove('has-preview');
+  }
+}
+
+document.getElementById('uploadForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  const form = e.target;
+  const precioInput = form.querySelector('input[name="precio"]');
+  const msg=document.getElementById('msg');
+  if (parseFloat(precioInput.value) <= 0 || !precioInput.value) {
+    msg.className='msg err';
+    msg.textContent='El precio debe ser mayor a $0';
+    precioInput.focus();
+    return;
+  }
+  const btn=document.getElementById('btnSubir');
+  btn.disabled=true;btn.textContent='Subiendo...';
+  msg.className='msg';msg.textContent='';
+  fetch('/fs2026subir',{method:'POST',body:new FormData(form)})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.ok){
+        msg.className='msg ok';
+        msg.textContent='✓ Foto subida correctamente. Podés verla en la pestaña Galería.';
+        form.reset();
+        document.getElementById('name1').textContent='';
+        document.getElementById('name2').textContent='';
+        document.getElementById('prev1').style.display='none';
+        document.getElementById('prev2').style.display='none';
+        document.getElementById('wrap1').classList.remove('has-preview');
+        document.getElementById('wrap2').classList.remove('has-preview');
+      } else {
+        msg.className='msg err';
+        msg.textContent='Error: '+(data.error||'No se pudo subir');
+      }
+    })
+    .catch(function(){
+      msg.className='msg err';
+      msg.textContent='Error de conexión.';
+    })
+    .finally(function(){
+      btn.disabled=false;btn.textContent='Subir foto';
+    });
+});
+
+function switchUploadTab(tab){
+  const formInd=document.getElementById('uploadForm');
+  const formMulti=document.getElementById('uploadFormMultiple');
+  const tabInd=document.getElementById('tabIndividual');
+  const tabMulti=document.getElementById('tabMultiple');
+  if(tab==='individual'){
+    formInd.style.display='block'; formMulti.style.display='none';
+    tabInd.classList.add('active'); tabMulti.classList.remove('active');
+  } else {
+    formInd.style.display='none'; formMulti.style.display='block';
+    tabInd.classList.remove('active'); tabMulti.classList.add('active');
+  }
+}
+
+function showMultiPreview(input,listId){
+  const list=document.getElementById(listId);
+  const files=Array.from(input.files||[]);
+  if(files.length===0){ list.innerHTML=''; return; }
+  list.innerHTML=files.map(function(f,i){ return '<div>'+(i+1)+'. '+f.name+'</div>'; }).join('');
+}
+
+document.getElementById('uploadFormMultiple').addEventListener('submit',function(e){
+  e.preventDefault();
+  const form=e.target;
+  const precioInput=form.querySelector('input[name="precio"]');
+  const msg=document.getElementById('msg');
+  const galInput=form.querySelector('input[name="fotos_galeria"]');
+  const descInput=form.querySelector('input[name="fotos_descarga"]');
+  const galFiles=Array.from(galInput.files||[]);
+  const descFiles=Array.from(descInput.files||[]);
+
+  if(parseFloat(precioInput.value)<=0||!precioInput.value){
+    msg.className='msg err'; msg.textContent='El precio debe ser mayor a $0'; precioInput.focus(); return;
+  }
+  if(galFiles.length===0||descFiles.length===0){
+    msg.className='msg err'; msg.textContent='Elegí al menos un par de fotos (galería y descarga)'; return;
+  }
+  if(galFiles.length!==descFiles.length){
+    msg.className='msg err'; msg.textContent='La cantidad de fotos de galería ('+galFiles.length+') no coincide con la de descarga ('+descFiles.length+')'; return;
+  }
+  if(galFiles.length>20){
+    msg.className='msg err'; msg.textContent='Máximo 20 fotos por lote'; return;
+  }
+
+  const fd=new FormData();
+  fd.append('categoria', form.querySelector('select[name="categoria"]').value);
+  fd.append('precio', precioInput.value);
+  fd.append('etiqueta', form.querySelector('input[name="etiqueta"]').value);
+  fd.append('descripcion', form.querySelector('input[name="descripcion"]').value);
+  fd.append('nombreBase', form.querySelector('input[name="nombreBase"]').value);
+  galFiles.forEach(function(f,i){ fd.append('foto_galeria_'+i, f); });
+  descFiles.forEach(function(f,i){ fd.append('foto_descarga_'+i, f); });
+
+  const btn=document.getElementById('btnSubirMulti');
+  btn.disabled=true; btn.textContent='Subiendo '+galFiles.length+' fotos...';
+  msg.className='msg'; msg.textContent='';
+
+  fetch('/fs2026subir-multiple',{method:'POST',body:fd})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.ok){
+        msg.className='msg ok';
+        msg.textContent='✓ '+data.subidas+' foto(s) subida(s) correctamente.'+(data.errores>0?(' ('+data.errores+' con error)'):'')+' Podés verlas en la pestaña Galería.';
+        form.reset();
+        document.getElementById('multi1').innerHTML='';
+        document.getElementById('multi2').innerHTML='';
+      } else {
+        msg.className='msg err';
+        msg.textContent='Error: '+(data.error||'No se pudo subir');
+      }
+    })
+    .catch(function(){
+      msg.className='msg err';
+      msg.textContent='Error de conexión.';
+    })
+    .finally(function(){
+      btn.disabled=false; btn.textContent='Subir todas las fotos';
+    });
+});
+</script>
+</body></html>`);
+  } catch (err) { res.status(500).send('Error'); }
+});
+
+app.get('/fs2026galeria', async (req, res) => {
+  if (!req.session.admin) return res.redirect('/fs2026admin');
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const [fotos] = await conn.execute('SELECT * FROM fotos ORDER BY fecha DESC');
+    const [categorias] = await conn.execute('SELECT * FROM categorias ORDER BY nombre ASC');
+    await conn.end();
+    fotos.forEach((f, idx) => { f.displayNum = idx + 1; });
+    const catMap = {};
+    categorias.forEach(c => { catMap[c.slug] = c.nombre; });
+    const catOptionsHTML = (selectedSlug) => categorias.map(c =>
+      `<option value="${c.slug}"${c.slug===selectedSlug?' selected':''}>${c.nombre}</option>`
+    ).join('');
+    res.send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Galería — Foco Salvaje</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937}
+  .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:10}
+  .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .nav-link{color:rgba(255,255,255,0.85);text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,0.3);padding:7px 16px;border-radius:8px;transition:all 0.2s;font-weight:500}
+  .nav-link:hover{background:rgba(255,255,255,0.12);color:white}
+  .nav-link.active{background:rgba(255,255,255,0.18);color:white;border-color:rgba(255,255,255,0.45)}
+  .container{padding:24px 20px 60px;max-width:1100px;margin:0 auto}
+  .gallery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .gallery-title{font-size:16px;font-weight:700;color:#04342C}
+  .filters-card{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:white;border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #eef1f0}
+  .filters-input{flex:1;min-width:180px;padding:9px 12px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:border 0.2s}
+  .filters-input:focus{border-color:#1D9E75}
+  .filters-select{padding:9px 10px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:white;min-width:140px}
+  .filters-select:focus{border-color:#1D9E75}
+  .filters-clear{background:#f3f4f6;color:#6b7280;border:none;padding:9px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background 0.2s}
+  .filters-clear:hover{background:#e5e7eb}
+  .filters-results{font-size:12.5px;color:#6b7280;margin-bottom:14px}
+  .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .foto-card{background:white;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(4,52,44,0.07);border:1px solid #eef1f0;transition:box-shadow 0.2s}
+  .foto-card:hover{box-shadow:0 6px 20px rgba(4,52,44,0.12)}
+  .foto-img-wrap{position:relative;aspect-ratio:4/3;overflow:hidden;background:#f1f3f2}
+  .foto-img{width:100%;height:100%;object-fit:cover;display:block}
+  .foto-id-badge{position:absolute;top:8px;left:8px;background:rgba(4,52,44,0.75);color:white;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:0.5px;backdrop-filter:blur(4px)}
+  .foto-info{padding:14px}
+  .foto-nombre{font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;line-height:1.3}
+  .foto-etiqueta{font-size:11px;color:#0d7a52;font-weight:600;margin-bottom:6px}
+  .foto-meta-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .foto-cat-pill{font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:#e6f4ee;color:#0d7a52}
+  .foto-precio{font-size:15px;font-weight:800;color:#04342C}
+  .btn-row{display:flex;gap:8px}
+  .btn-editar{flex:1;background:#eaf3fb;color:#1d5e8c;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.2s}
+  .btn-editar:hover{background:#d4e9f9}
+  .btn-eliminar{flex:1;background:#fdecec;color:#b3261e;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:background 0.2s}
+  .btn-eliminar:hover{background:#fbd5d5}
+  .empty{text-align:center;padding:56px 24px;color:#9ca3af;background:white;border-radius:16px;border:1px solid #eef1f0}
+  .empty-icon{font-size:40px;margin-bottom:10px}
+  .empty a.btn-subir-link{display:inline-block;margin-top:16px;background:linear-gradient(135deg,#04342C,#1D9E75);color:white;padding:11px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600}
+  .edit-form{display:none;padding:16px;background:#f8fafc;border-top:1px solid #eef1f0}
+  .edit-form.open{display:block;animation:slideDown 0.2s ease}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  .edit-form .fg{margin-bottom:10px}
+  .edit-form .fg label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px;display:block;margin-bottom:5px}
+  .edit-form input,.edit-form select{padding:8px 10px;font-size:12.5px;border:1.5px solid #e2e5e9;border-radius:8px;width:100%;font-family:inherit;outline:none}
+  .edit-form input:focus,.edit-form select:focus{border-color:#1D9E75}
+  .edit-actions{display:flex;gap:8px;margin-top:10px}
+  .btn-guardar{flex:1;background:#04342C;color:white;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-guardar:hover{background:#0F6E56}
+  .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-cancelar:hover{background:#d1d5db}
+  @media(max-width:700px){.fotos-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px 12px 50px}}
+  @media(max-width:420px){.fotos-grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="navbar">
+  <div class="navbar-brand">🎣 Foco Salvaje</div>
+  <div class="navbar-links">
+    <a class="nav-link" href="/fs2026fotos">📤 Subir fotos</a>
+    <a class="nav-link active" href="/fs2026galeria">🖼️ Galería</a>
+    <a class="nav-link" href="/fs2026pedidos">📋 Pedidos</a>
+    <a class="nav-link" href="/fs2026logout">Salir</a>
+  </div>
+</div>
+<div class="container">
+  <div class="gallery-header">
+    <div class="gallery-title" id="galleryTitle">Fotos en la galería (${fotos.length})</div>
+  </div>
+
+  <div class="filters-card" id="filtersCard" style="display:${fotos.length === 0 ? 'none' : 'flex'}">
+    <input type="text" id="fotosBuscar" class="filters-input" placeholder="🔍 Buscar por nombre..." oninput="aplicarFiltrosFotos()">
+    <select id="fotosFiltroCat" class="filters-select" onchange="aplicarFiltrosFotos()">
+      <option value="">Todas las categorías</option>
+      ${catOptionsHTML(null)}
+    </select>
+    <select id="fotosFiltroEtq" class="filters-select" onchange="aplicarFiltrosFotos()">
+      <option value="">Todas las etiquetas</option>
+    </select>
+    <button class="filters-clear" onclick="limpiarFiltrosFotos()">✕ Limpiar</button>
+  </div>
+  <div class="filters-results" id="fotosFiltroResultados" style="display:none"></div>
+  <div id="fotosContainer">
+  ${fotos.length === 0 ? '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía.<br><a class="btn-subir-link" href="/fs2026fotos">Subir la primera foto</a></div>' : `
+  <div class="fotos-grid">
+    ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}" data-nombre="${f.nombre.toLowerCase().replace(/"/g,'')}" data-cat="${f.categoria}" data-etq="${(f.etiqueta || '').toLowerCase().replace(/"/g,'')}">
+      <div class="foto-img-wrap">
+        <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
+        <div class="foto-id-badge">#${String(f.displayNum).padStart(3,'0')}</div>
+      </div>
+      <div class="foto-info">
+        <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
+        ${f.etiqueta ? `<div class="foto-etiqueta" id="etq-${f.id}">🏷 ${f.etiqueta}</div>` : `<div class="foto-etiqueta" id="etq-${f.id}" style="display:none"></div>`}
+        <div class="foto-meta-row">
+          <span class="foto-cat-pill" id="cat-${f.id}" data-cat="${f.categoria}">${catMap[f.categoria] || f.categoria}</span>
+          <span class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn-editar" onclick="toggleEdit(${f.id})">✏️ Editar</button>
+          <button class="btn-eliminar" onclick="eliminarFoto(${f.id})">🗑 Eliminar</button>
+        </div>
+      </div>
+      <div class="edit-form" id="edit-${f.id}">
+        <div class="fg"><label>Nombre</label><input type="text" id="edit-nombre-${f.id}" value="${f.nombre}"></div>
+        <div class="fg"><label>Categoría</label>
+          <select id="edit-cat-${f.id}" class="edit-cat-select">${catOptionsHTML(f.categoria)}</select>
+        </div>
+        <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}" min="1" step="1"></div>
+        <div class="fg"><label>Etiqueta</label><input type="text" id="edit-etq-${f.id}" value="${f.etiqueta || ''}" placeholder="Ej: Corredor 22"></div>
+        <div class="fg"><label>Descripción</label><input type="text" id="edit-desc-${f.id}" value="${f.descripcion || ''}" placeholder="Opcional"></div>
+        <div class="edit-actions">
+          <button class="btn-guardar" onclick="guardarEdit(${f.id})">Guardar</button>
+          <button class="btn-cancelar" onclick="toggleEdit(${f.id})">Cancelar</button>
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>`}
+  </div>
+</div>
+<script>
+var CAT_MAP = ${JSON.stringify(catMap)};
+var CATEGORIAS = ${JSON.stringify(categorias)};
+poblarFiltroEtiquetasDesdeCards();
+
+function catOptionsHTML(selectedSlug){
+  return CATEGORIAS.map(function(c){
+    return '<option value="'+c.slug+'"'+(c.slug===selectedSlug?' selected':'')+'>'+c.nombre+'</option>';
+  }).join('');
 }
 
 function fotoCardHTML(f, displayNum) {
@@ -1043,7 +1226,7 @@ function refrescarGaleria() {
       var cont = document.getElementById('fotosContainer');
       var filtersCard = document.getElementById('filtersCard');
       if (fotos.length === 0) {
-        cont.innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
+        cont.innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía.<br><a class="btn-subir-link" href="/fs2026fotos">Subir la primera foto</a></div>';
         filtersCard.style.display = 'none';
       } else {
         var gridHtml = '<div class="fotos-grid">';
@@ -1060,69 +1243,6 @@ function refrescarGaleria() {
     .catch(function(err){ console.error('Error refrescando galería:', err); });
 }
 
-function showPreview(input,nameId,prevId,wrapId){
-  const file=input.files[0];
-  document.getElementById(nameId).textContent=file?file.name:'';
-  const img=document.getElementById(prevId);
-  const wrap=document.getElementById(wrapId);
-  if(file){
-    const reader=new FileReader();
-    reader.onload=function(e){
-      img.src=e.target.result;
-      img.style.display='block';
-      wrap.classList.add('has-preview');
-    };
-    reader.readAsDataURL(file);
-  } else {
-    img.style.display='none';
-    wrap.classList.remove('has-preview');
-  }
-}
-
-document.getElementById('uploadForm').addEventListener('submit',function(e){
-  e.preventDefault();
-  const form = e.target;
-  const precioInput = form.querySelector('input[name="precio"]');
-  const msg=document.getElementById('msg');
-  if (parseFloat(precioInput.value) <= 0 || !precioInput.value) {
-    msg.className='msg err';
-    msg.textContent='El precio debe ser mayor a $0';
-    precioInput.focus();
-    return;
-  }
-  const btn=document.getElementById('btnSubir');
-  btn.disabled=true;btn.textContent='Subiendo...';
-  msg.className='msg';msg.textContent='';
-  fetch('/fs2026subir',{method:'POST',body:new FormData(form)})
-    .then(function(res){ return res.json(); })
-    .then(function(data){
-      if(data.ok){
-        msg.className='msg ok';
-        msg.textContent='✓ Foto subida correctamente.';
-        form.reset();
-        document.getElementById('name1').textContent='';
-        document.getElementById('name2').textContent='';
-        document.getElementById('prev1').style.display='none';
-        document.getElementById('prev2').style.display='none';
-        document.getElementById('wrap1').classList.remove('has-preview');
-        document.getElementById('wrap2').classList.remove('has-preview');
-        return refrescarGaleria().then(function(){
-          setTimeout(function(){ msg.className='msg'; msg.textContent=''; }, 3500);
-        });
-      } else {
-        msg.className='msg err';
-        msg.textContent='Error: '+(data.error||'No se pudo subir');
-      }
-    })
-    .catch(function(){
-      msg.className='msg err';
-      msg.textContent='Error de conexión.';
-    })
-    .finally(function(){
-      btn.disabled=false;btn.textContent='Subir foto';
-    });
-});
-
 function eliminarFoto(id){
   if(!confirm('¿Eliminar esta foto?'))return;
   fetch('/fs2026eliminar/'+id,{method:'POST'})
@@ -1135,7 +1255,8 @@ function eliminarFoto(id){
         var current = document.querySelectorAll('.foto-card').length;
         title.textContent = 'Fotos en la galería (' + current + ')';
         if(current === 0){
-          document.getElementById('fotosContainer').innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
+          document.getElementById('fotosContainer').innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía.<br><a class="btn-subir-link" href="/fs2026fotos">Subir la primera foto</a></div>';
+          document.getElementById('filtersCard').style.display = 'none';
         }
       }
     });
@@ -1169,95 +1290,16 @@ function guardarEdit(id){
         const etqEl=document.getElementById('etq-'+id);
         if(etiqueta){ etqEl.textContent='🏷 '+etiqueta; etqEl.style.display='block'; }
         else { etqEl.textContent=''; etqEl.style.display='none'; }
+        document.getElementById('foto-'+id).dataset.nombre = nombre.toLowerCase();
+        document.getElementById('foto-'+id).dataset.cat = categoria;
+        document.getElementById('foto-'+id).dataset.etq = etiqueta.toLowerCase();
+        poblarFiltroEtiquetasDesdeCards();
         toggleEdit(id);
       } else {
         alert('Error al guardar: '+(data.error||''));
       }
     });
 }
-
-function switchUploadTab(tab){
-  const formInd=document.getElementById('uploadForm');
-  const formMulti=document.getElementById('uploadFormMultiple');
-  const tabInd=document.getElementById('tabIndividual');
-  const tabMulti=document.getElementById('tabMultiple');
-  if(tab==='individual'){
-    formInd.style.display='block'; formMulti.style.display='none';
-    tabInd.classList.add('active'); tabMulti.classList.remove('active');
-  } else {
-    formInd.style.display='none'; formMulti.style.display='block';
-    tabInd.classList.remove('active'); tabMulti.classList.add('active');
-  }
-}
-
-function showMultiPreview(input,listId){
-  const list=document.getElementById(listId);
-  const files=Array.from(input.files||[]);
-  if(files.length===0){ list.innerHTML=''; return; }
-  list.innerHTML=files.map(function(f,i){ return '<div>'+(i+1)+'. '+f.name+'</div>'; }).join('');
-}
-
-document.getElementById('uploadFormMultiple').addEventListener('submit',function(e){
-  e.preventDefault();
-  const form=e.target;
-  const precioInput=form.querySelector('input[name="precio"]');
-  const msg=document.getElementById('msg');
-  const galInput=form.querySelector('input[name="fotos_galeria"]');
-  const descInput=form.querySelector('input[name="fotos_descarga"]');
-  const galFiles=Array.from(galInput.files||[]);
-  const descFiles=Array.from(descInput.files||[]);
-
-  if(parseFloat(precioInput.value)<=0||!precioInput.value){
-    msg.className='msg err'; msg.textContent='El precio debe ser mayor a $0'; precioInput.focus(); return;
-  }
-  if(galFiles.length===0||descFiles.length===0){
-    msg.className='msg err'; msg.textContent='Elegí al menos un par de fotos (galería y descarga)'; return;
-  }
-  if(galFiles.length!==descFiles.length){
-    msg.className='msg err'; msg.textContent='La cantidad de fotos de galería ('+galFiles.length+') no coincide con la de descarga ('+descFiles.length+')'; return;
-  }
-  if(galFiles.length>20){
-    msg.className='msg err'; msg.textContent='Máximo 20 fotos por lote'; return;
-  }
-
-  const fd=new FormData();
-  fd.append('categoria', form.querySelector('select[name="categoria"]').value);
-  fd.append('precio', precioInput.value);
-  fd.append('etiqueta', form.querySelector('input[name="etiqueta"]').value);
-  fd.append('descripcion', form.querySelector('input[name="descripcion"]').value);
-  fd.append('nombreBase', form.querySelector('input[name="nombreBase"]').value);
-  galFiles.forEach(function(f,i){ fd.append('foto_galeria_'+i, f); });
-  descFiles.forEach(function(f,i){ fd.append('foto_descarga_'+i, f); });
-
-  const btn=document.getElementById('btnSubirMulti');
-  btn.disabled=true; btn.textContent='Subiendo '+galFiles.length+' fotos...';
-  msg.className='msg'; msg.textContent='';
-
-  fetch('/fs2026subir-multiple',{method:'POST',body:fd})
-    .then(function(res){ return res.json(); })
-    .then(function(data){
-      if(data.ok){
-        msg.className='msg ok';
-        msg.textContent='✓ '+data.subidas+' foto(s) subida(s) correctamente.'+(data.errores>0?(' ('+data.errores+' con error)'):'');
-        form.reset();
-        document.getElementById('multi1').innerHTML='';
-        document.getElementById('multi2').innerHTML='';
-        return refrescarGaleria().then(function(){
-          setTimeout(function(){ msg.className='msg'; msg.textContent=''; }, 4500);
-        });
-      } else {
-        msg.className='msg err';
-        msg.textContent='Error: '+(data.error||'No se pudo subir');
-      }
-    })
-    .catch(function(){
-      msg.className='msg err';
-      msg.textContent='Error de conexión.';
-    })
-    .finally(function(){
-      btn.disabled=false; btn.textContent='Subir todas las fotos';
-    });
-});
 </script>
 </body></html>`);
   } catch (err) { res.status(500).send('Error'); }
@@ -1348,7 +1390,8 @@ app.get('/fs2026pedidos', async (req, res) => {
 <div class="navbar">
   <div class="navbar-brand">🎣 Foco Salvaje</div>
   <div class="navbar-links">
-    <a class="nav-link" href="/fs2026fotos">📷 Fotos</a>
+    <a class="nav-link" href="/fs2026fotos">📤 Subir fotos</a>
+    <a class="nav-link" href="/fs2026galeria">🖼️ Galería</a>
     <a class="nav-link active" href="/fs2026pedidos">📋 Pedidos</a>
     <a class="nav-link" href="/fs2026logout">Salir</a>
   </div>

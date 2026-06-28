@@ -700,6 +700,14 @@ app.get('/fs2026fotos', async (req, res) => {
   .cat-msg.err{color:#b3261e;display:block}
   .gallery-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
   .gallery-title{font-size:16px;font-weight:700;color:#04342C}
+  .filters-card{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:white;border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #eef1f0}
+  .filters-input{flex:1;min-width:180px;padding:9px 12px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:border 0.2s}
+  .filters-input:focus{border-color:#1D9E75}
+  .filters-select{padding:9px 10px;border:1.5px solid #e2e5e9;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:white;min-width:140px}
+  .filters-select:focus{border-color:#1D9E75}
+  .filters-clear{background:#f3f4f6;color:#6b7280;border:none;padding:9px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background 0.2s}
+  .filters-clear:hover{background:#e5e7eb}
+  .filters-results{font-size:12.5px;color:#6b7280;margin-bottom:14px}
   .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .foto-card{background:white;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(4,52,44,0.07);border:1px solid #eef1f0;transition:box-shadow 0.2s}
   .foto-card:hover{box-shadow:0 6px 20px rgba(4,52,44,0.12)}
@@ -843,10 +851,23 @@ app.get('/fs2026fotos', async (req, res) => {
   <div class="gallery-header">
     <div class="gallery-title" id="galleryTitle">Fotos en la galería (${fotos.length})</div>
   </div>
+
+  <div class="filters-card" id="filtersCard" style="display:${fotos.length === 0 ? 'none' : 'flex'}">
+    <input type="text" id="fotosBuscar" class="filters-input" placeholder="🔍 Buscar por nombre..." oninput="aplicarFiltrosFotos()">
+    <select id="fotosFiltroCat" class="filters-select" onchange="aplicarFiltrosFotos()">
+      <option value="">Todas las categorías</option>
+      ${catOptionsHTML(null)}
+    </select>
+    <select id="fotosFiltroEtq" class="filters-select" onchange="aplicarFiltrosFotos()">
+      <option value="">Todas las etiquetas</option>
+    </select>
+    <button class="filters-clear" onclick="limpiarFiltrosFotos()">✕ Limpiar</button>
+  </div>
+  <div class="filters-results" id="fotosFiltroResultados" style="display:none"></div>
   <div id="fotosContainer">
   ${fotos.length === 0 ? '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>' : `
   <div class="fotos-grid">
-    ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}">
+    ${fotos.map(f => `<div class="foto-card" id="foto-${f.id}" data-nombre="${f.nombre.toLowerCase().replace(/"/g,'')}" data-cat="${f.categoria}" data-etq="${(f.etiqueta || '').toLowerCase().replace(/"/g,'')}">
       <div class="foto-img-wrap">
         <img class="foto-img" src="${f.url_galeria}" alt="${f.nombre}">
         <div class="foto-id-badge">#${String(f.displayNum).padStart(3,'0')}</div>
@@ -883,6 +904,7 @@ app.get('/fs2026fotos', async (req, res) => {
 <script>
 var CAT_MAP = ${JSON.stringify(catMap)};
 var CATEGORIAS = ${JSON.stringify(categorias)};
+poblarFiltroEtiquetasDesdeCards();
 
 function catOptionsHTML(selectedSlug){
   return CATEGORIAS.map(function(c){
@@ -940,7 +962,7 @@ async function eliminarCategoria(id){
 function fotoCardHTML(f, displayNum) {
   var catLabel = CAT_MAP[f.categoria] || f.categoria;
   var html = '';
-  html += '<div class="foto-card" id="foto-' + f.id + '">';
+  html += '<div class="foto-card" id="foto-' + f.id + '" data-nombre="' + f.nombre.toLowerCase().replace(/"/g,'') + '" data-cat="' + f.categoria + '" data-etq="' + (f.etiqueta || '').toLowerCase().replace(/"/g,'') + '">';
   html += '<div class="foto-img-wrap">';
   html += '<img class="foto-img" src="' + f.url_galeria + '" alt="' + f.nombre + '">';
   html += '<div class="foto-id-badge">#' + String(displayNum).padStart(3,'0') + '</div>';
@@ -974,14 +996,55 @@ function fotoCardHTML(f, displayNum) {
   return html;
 }
 
+function poblarFiltroEtiquetasDesdeCards(){
+  const sel = document.getElementById('fotosFiltroEtq');
+  if (!sel) return;
+  const visibles = Array.from(document.querySelectorAll('.foto-etiqueta'));
+  const etqTexts = [...new Set(visibles.map(el => el.textContent.replace('🏷', '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  sel.innerHTML = '<option value="">Todas las etiquetas</option>' + etqTexts.map(function(e){ return '<option value="' + e.toLowerCase() + '">' + e + '</option>'; }).join('');
+}
+
+function aplicarFiltrosFotos(){
+  const q = document.getElementById('fotosBuscar').value.trim().toLowerCase();
+  const cat = document.getElementById('fotosFiltroCat').value;
+  const etq = document.getElementById('fotosFiltroEtq').value.toLowerCase();
+  const cards = document.querySelectorAll('.foto-card');
+  let visibles = 0;
+  cards.forEach(card => {
+    const matchQ = !q || card.dataset.nombre.includes(q);
+    const matchCat = !cat || card.dataset.cat === cat;
+    const matchEtq = !etq || card.dataset.etq === etq;
+    const visible = matchQ && matchCat && matchEtq;
+    card.style.display = visible ? '' : 'none';
+    if (visible) visibles++;
+  });
+  const resultados = document.getElementById('fotosFiltroResultados');
+  const hayFiltro = q || cat || etq;
+  if (hayFiltro) {
+    resultados.style.display = 'block';
+    resultados.textContent = 'Mostrando ' + visibles + ' de ' + cards.length + ' fotos';
+  } else {
+    resultados.style.display = 'none';
+  }
+}
+
+function limpiarFiltrosFotos(){
+  document.getElementById('fotosBuscar').value = '';
+  document.getElementById('fotosFiltroCat').value = '';
+  document.getElementById('fotosFiltroEtq').value = '';
+  aplicarFiltrosFotos();
+}
+
 function refrescarGaleria() {
   return fetch('/api/fotos')
     .then(function(res){ return res.json(); })
     .then(function(fotos){
       document.getElementById('galleryTitle').textContent = 'Fotos en la galería (' + fotos.length + ')';
       var cont = document.getElementById('fotosContainer');
+      var filtersCard = document.getElementById('filtersCard');
       if (fotos.length === 0) {
         cont.innerHTML = '<div class="empty"><div class="empty-icon">📷</div>No hay fotos todavía. ¡Subí la primera!</div>';
+        filtersCard.style.display = 'none';
       } else {
         var gridHtml = '<div class="fotos-grid">';
         for (var i = 0; i < fotos.length; i++) {
@@ -989,6 +1052,9 @@ function refrescarGaleria() {
         }
         gridHtml += '</div>';
         cont.innerHTML = gridHtml;
+        filtersCard.style.display = 'flex';
+        poblarFiltroEtiquetasDesdeCards();
+        aplicarFiltrosFotos();
       }
     })
     .catch(function(err){ console.error('Error refrescando galería:', err); });

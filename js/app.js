@@ -50,6 +50,7 @@ async function loadCategorias(){
 
 let activeCat = 'todas';
 let activeTag = 'todas';
+let tagFilterActive = false;
 
 function renderFilters(){
   const cats = [...new Set(photos.map(p=>p.cat))]
@@ -71,15 +72,19 @@ function renderTagFilters(){
     return;
   }
   bar.style.display = 'flex';
-  bar.innerHTML = `<button class="fbtn tbtn active" onclick="filterByTag('todas',this)">🏷 Todas las etiquetas</button>`
+  bar.innerHTML = `<button class="fbtn tbtn active" onclick="clearTagFilter(this)">✕ Sin filtro de etiqueta</button>`
     + tags.map(t=>`<button class="fbtn tbtn" onclick="filterByTag('${t.replace(/'/g,"\\'")}',this)">🏷 ${t}</button>`).join('');
 }
 
 function applyFilters(){
   lbList = photos.filter(p => {
     const matchCat = activeCat === 'todas' || p.cat === activeCat;
-    const matchTag = activeTag === 'todas' || p.tag === activeTag;
-    return matchCat && matchTag;
+    if(tagFilterActive){
+      if(!p.tag) return false;
+      const matchTag = activeTag === 'todas' || p.tag === activeTag;
+      return matchCat && matchTag;
+    }
+    return matchCat;
   });
   renderGrid(lbList);
 }
@@ -152,6 +157,15 @@ function filterByTag(tag,btn){
   document.querySelectorAll('.tag-filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   activeTag = tag;
+  tagFilterActive = true;
+  applyFilters();
+}
+
+function clearTagFilter(btn){
+  document.querySelectorAll('.tag-filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeTag = 'todas';
+  tagFilterActive = false;
   applyFilters();
 }
 

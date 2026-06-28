@@ -483,7 +483,49 @@ app.get('/pago-exitoso', async (req, res) => {
     console.log('Pago exitoso redirect, payment_id:', paymentId);
     await actualizarPedidoPorPago(paymentId);
   }
-  res.send(`<html><head><meta charset="UTF-8"><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:#F4EFE6;margin:0}.box{text-align:center;background:white;padding:48px;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}h1{color:#1D9E75;font-size:28px;margin-bottom:12px}p{color:#5C5C58;margin-bottom:24px}a{background:#04342C;color:white;padding:12px 28px;border-radius:4px;text-decoration:none;font-size:14px}</style></head><body><div class="box"><h1>✓ Pago exitoso</h1><p>Tu compra fue procesada correctamente.<br>Vas a recibir las fotos por email.</p><a href="/">Volver a la galería</a></div></body></html>`);
+  res.send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>¡Compra exitosa! — Foco Salvaje</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;background:linear-gradient(135deg,#04342C 0%,#0F6E56 60%,#1D9E75 100%);display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{text-align:center;background:white;padding:44px 36px;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.25);max-width:440px;width:100%}
+  .check{width:72px;height:72px;border-radius:50%;background:#e3f7ee;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+  .check svg{width:36px;height:36px;color:#0a6b46}
+  h1{color:#04342C;font-size:24px;margin-bottom:8px;font-weight:700}
+  .sub{color:#5C5C58;font-size:14px;margin-bottom:24px;line-height:1.6}
+  .email-box{background:#f7f9f8;border:1px solid #e8ece9;border-radius:10px;padding:14px 16px;margin-bottom:20px;text-align:left}
+  .email-box-title{font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+  .email-box p{font-size:13px;color:#374151;line-height:1.6;margin:0}
+  .spam-warn{display:flex;align-items:flex-start;gap:10px;background:#fff8e6;border:1px solid #fde9b8;border-radius:10px;padding:14px 16px;margin-bottom:24px;text-align:left}
+  .spam-warn svg{width:18px;height:18px;color:#d97706;flex-shrink:0;margin-top:1px}
+  .spam-warn p{font-size:12.5px;color:#92660a;line-height:1.6;margin:0}
+  .spam-warn strong{color:#7a5206}
+  a.btn{display:inline-block;background:#04342C;color:white;padding:13px 28px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;transition:background 0.2s}
+  a.btn:hover{background:#0F6E56}
+  .help{margin-top:20px;font-size:12px;color:#9ca3af}
+  .help a{color:#1D9E75;text-decoration:none;font-weight:600}
+</style></head>
+<body>
+  <div class="box">
+    <div class="check">
+      <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h1>¡Gracias por tu compra!</h1>
+    <p class="sub">Tu pago fue confirmado correctamente. En unos instantes vas a recibir un email con los links de descarga de tus fotos en alta resolución.</p>
+    <div class="email-box">
+      <div class="email-box-title">📧 Revisá tu correo</div>
+      <p>El email llega desde <strong>pedidos@focosalvaje.com</strong> con el asunto "¡Tus fotos de Foco Salvaje están listas!".</p>
+    </div>
+    <div class="spam-warn">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      <p><strong>¿No te llegó nada?</strong> Revisá la carpeta de Spam o Promociones — a veces los emails con links de descarga caen ahí por error.</p>
+    </div>
+    <a class="btn" href="/">Volver a la galería</a>
+    <div class="help">¿Pasaron varios minutos y nada? Escribinos a <a href="mailto:focosalvajeph@gmail.com">focosalvajeph@gmail.com</a></div>
+  </div>
+</body>
+</html>`);
 });
 
 app.post('/fs2026eliminar-pedido/:id', async (req, res) => {

@@ -611,6 +611,11 @@ app.get('/fs2026admin', (req, res) => {
   input:focus{border-color:#1D9E75}
   button{width:100%;background:linear-gradient(135deg,#04342C,#1D9E75);color:white;border:none;padding:13px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.2s}
   button:hover{opacity:0.9}
+  .pwd-wrap{position:relative;margin-bottom:20px}
+  .pwd-wrap input{margin-bottom:0;padding-right:44px}
+  .pwd-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9ca3af;padding:6px;display:flex;align-items:center;justify-content:center;width:auto;transition:color 0.2s}
+  .pwd-toggle:hover{color:#04342C;opacity:1}
+  .pwd-toggle svg{width:20px;height:20px}
 </style></head>
 <body><div class="card">
   <div class="logo">
@@ -621,10 +626,32 @@ app.get('/fs2026admin', (req, res) => {
   ${error ? '<div class="error">Contraseña incorrecta. Intentá de nuevo.</div>' : ''}
   <form action="/fs2026admin" method="post">
     <label>Contraseña</label>
-    <input type="password" name="pass" placeholder="••••••••" autofocus>
+    <div class="pwd-wrap">
+      <input type="password" name="pass" id="passInput" placeholder="••••••••" autofocus>
+      <button type="button" class="pwd-toggle" onclick="togglePwd()" id="pwdToggleBtn" aria-label="Mostrar contraseña">
+        <svg id="eyeIcon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
     <button type="submit">Ingresar al panel</button>
   </form>
-</div></body></html>`);
+</div>
+<script>
+function togglePwd(){
+  const input = document.getElementById('passInput');
+  const icon = document.getElementById('eyeIcon');
+  const btn = document.getElementById('pwdToggleBtn');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.innerHTML = '<path d="M17.94 17.94A10.94 10.94 0 0112 20c-7 0-11-7-11-7a18.5 18.5 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    btn.setAttribute('aria-label','Ocultar contraseña');
+  } else {
+    input.type = 'password';
+    icon.innerHTML = '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>';
+    btn.setAttribute('aria-label','Mostrar contraseña');
+  }
+}
+</script>
+</body></html>`);
 });
 
 app.post('/fs2026admin', (req, res) => {

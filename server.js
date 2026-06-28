@@ -320,7 +320,7 @@ app.post('/fs2026subir-multiple', upload.fields([
           cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}_${i}` }, (err, result) => err ? reject(err) : resolve(result)).end(descFile.buffer);
         });
         const nombreFoto = (nombreBase && nombreBase.trim())
-          ? `${nombreBase.trim()} ${i + 1}`
+          ? `${nombreBase.trim()} — Foto ${i + 1}`
           : (galFile.originalname ? galFile.originalname.replace(/\.[^/.]+$/, '') : `Foto ${i + 1}`);
         await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombreFoto, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null, etiqueta || null]);
         subidas++;
@@ -762,7 +762,7 @@ app.get('/fs2026fotos', async (req, res) => {
 
     <form id="uploadFormMultiple" style="display:none">
       <div class="form-grid">
-        <div class="fg"><label>Nombre base (opcional)</label><input type="text" name="nombreBase" placeholder="Ej: Corredor 22 — se numeran automático"></div>
+        <div class="fg"><label>Nombre base (opcional)</label><input type="text" name="nombreBase" placeholder="Ej: Corredor 22 → Corredor 22 — Foto 1, 2..."></div>
         <div class="fg"><label>Categoría</label><select name="categoria" id="uploadCatSelectMulti">${catOptionsHTML(null)}</select></div>
       </div>
       <div class="form-grid" style="margin-top:18px">

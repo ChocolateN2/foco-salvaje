@@ -134,7 +134,7 @@ function emailFotosHTML({ nombreComprador, fotos }) {
             </td>
           </tr>
         </table>
-        <p style="margin:20px 0 0;font-size:11px;color:#9C9C94;">© 2026 Foco Salvaje — Carrizal, Mendoza</p>
+        <p style="margin:20px 0 0;font-size:11px;color:#9C9C94;">© 2026 Foco Salvaje — Mendoza, Argentina</p>
       </td>
     </tr>
   </table>
@@ -164,7 +164,6 @@ async function initDB() {
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN entregado TINYINT(1) DEFAULT 0'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_preference_id VARCHAR(255)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_payment_id VARCHAR(255)'); } catch(e) {}
-    // Sembrar categorías iniciales si la tabla está vacía
     const [catCount] = await conn.execute('SELECT COUNT(*) as c FROM categorias');
     if (catCount[0].c === 0) {
       const defaults = [

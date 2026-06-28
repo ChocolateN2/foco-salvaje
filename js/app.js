@@ -62,18 +62,26 @@ function renderFilters(){
 }
 
 function renderTagFilters(){
-  const tags = [...new Set(photos.map(p=>p.tag).filter(t=>t))]
-    .sort((a,b)=>a.localeCompare(b,'es'));
   const bar = document.querySelector('.tag-filter-bar');
   if(!bar) return;
+  const relevantPhotos = activeCat === 'todas' ? photos : photos.filter(p => p.cat === activeCat);
+  const tags = [...new Set(relevantPhotos.map(p=>p.tag).filter(t=>t))]
+    .sort((a,b)=>a.localeCompare(b,'es'));
   if(tags.length === 0){
     bar.innerHTML = '';
     bar.style.display = 'none';
+    activeTag = 'todas';
+    tagFilterActive = false;
     return;
   }
   bar.style.display = 'flex';
   bar.innerHTML = `<button class="fbtn tbtn active" onclick="clearTagFilter(this)">✕ Sin filtro de etiqueta</button>`
     + tags.map(t=>`<button class="fbtn tbtn" onclick="filterByTag('${t.replace(/'/g,"\\'")}',this)">🏷 ${t}</button>`).join('');
+  // Si la etiqueta activa ya no pertenece a la categoría seleccionada, se resetea
+  if(tagFilterActive && !tags.includes(activeTag)){
+    activeTag = 'todas';
+    tagFilterActive = false;
+  }
 }
 
 function applyFilters(){
@@ -150,6 +158,7 @@ function filterPhotos(cat,btn){
   document.querySelectorAll('.filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   activeCat = cat;
+  renderTagFilters();
   applyFilters();
 }
 

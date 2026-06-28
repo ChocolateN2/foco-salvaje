@@ -48,12 +48,40 @@ async function loadCategorias(){
   }
 }
 
+let activeCat = 'todas';
+let activeTag = 'todas';
+
 function renderFilters(){
   const cats = [...new Set(photos.map(p=>p.cat))]
     .sort((a,b)=>catLabel(a).localeCompare(catLabel(b),'es'));
   const bar = document.querySelector('.filter-bar');
   bar.innerHTML = `<button class="fbtn active" onclick="filterPhotos('todas',this)">Todas</button>`
     + cats.map(c=>`<button class="fbtn" onclick="filterPhotos('${c}',this)">${catLabel(c)}</button>`).join('');
+  renderTagFilters();
+}
+
+function renderTagFilters(){
+  const tags = [...new Set(photos.map(p=>p.tag).filter(t=>t))]
+    .sort((a,b)=>a.localeCompare(b,'es'));
+  const bar = document.querySelector('.tag-filter-bar');
+  if(!bar) return;
+  if(tags.length === 0){
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  bar.innerHTML = `<button class="fbtn tbtn active" onclick="filterByTag('todas',this)">🏷 Todas las etiquetas</button>`
+    + tags.map(t=>`<button class="fbtn tbtn" onclick="filterByTag('${t.replace(/'/g,"\\'")}',this)">🏷 ${t}</button>`).join('');
+}
+
+function applyFilters(){
+  lbList = photos.filter(p => {
+    const matchCat = activeCat === 'todas' || p.cat === activeCat;
+    const matchTag = activeTag === 'todas' || p.tag === activeTag;
+    return matchCat && matchTag;
+  });
+  renderGrid(lbList);
 }
 
 async function loadPhotos(){
@@ -75,6 +103,7 @@ async function loadPhotos(){
       img: f.url_galeria,
       url_descarga: f.url_descarga,
       desc: f.descripcion || '',
+      tag: f.etiqueta || '',
     }));
     lbList = [...photos];
     renderFilters();
@@ -113,10 +142,17 @@ function renderGrid(list){
 }
 
 function filterPhotos(cat,btn){
-  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  lbList=cat==='todas'?[...photos]:photos.filter(p=>p.cat===cat);
-  renderGrid(lbList);
+  activeCat = cat;
+  applyFilters();
+}
+
+function filterByTag(tag,btn){
+  document.querySelectorAll('.tag-filter-bar .fbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeTag = tag;
+  applyFilters();
 }
 
 function openLB(id){const idx=lbList.findIndex(p=>p.id===id);if(idx===-1)return;lbCurrent=idx;updateLB();document.getElementById('lightbox').classList.add('open');}
@@ -128,7 +164,7 @@ function updateLB(){
   document.getElementById('lbImg').innerHTML=`<img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:contain;border-radius:4px;">`;
   document.getElementById('lbNum').textContent='#'+String(p.displayNum).padStart(3,'0')+' — '+(lbCurrent+1)+' de '+lbList.length;
   document.getElementById('lbName').textContent=p.name;
-  document.getElementById('lbCat').textContent=catLabel(p.cat);
+  document.getElementById('lbCat').textContent=catLabel(p.cat) + (p.tag ? '  ·  🏷 ' + p.tag : '');
   const descEl=document.getElementById('lbDesc');
   descEl.textContent=p.desc||'';
   descEl.style.display=p.desc?'block':'none';

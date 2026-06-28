@@ -158,9 +158,10 @@ async function initDB() {
   try {
     const conn = await mysql.createConnection(dbConfig);
     await conn.execute(`CREATE TABLE IF NOT EXISTS pedidos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, email VARCHAR(255) NOT NULL, fotos TEXT NOT NULL, total DECIMAL(10,2) NOT NULL, estado VARCHAR(50) DEFAULT 'pendiente', entregado TINYINT(1) DEFAULT 0, mp_preference_id VARCHAR(255), mp_payment_id VARCHAR(255), fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
-    await conn.execute(`CREATE TABLE IF NOT EXISTS fotos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, categoria VARCHAR(50) DEFAULT 'accion', precio DECIMAL(10,2) NOT NULL, url_galeria VARCHAR(500) NOT NULL, url_descarga VARCHAR(500) NOT NULL, descripcion TEXT, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS fotos (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(255) NOT NULL, categoria VARCHAR(50) DEFAULT 'accion', precio DECIMAL(10,2) NOT NULL, url_galeria VARCHAR(500) NOT NULL, url_descarga VARCHAR(500) NOT NULL, descripcion TEXT, etiqueta VARCHAR(100), fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     await conn.execute(`CREATE TABLE IF NOT EXISTS categorias (id INT AUTO_INCREMENT PRIMARY KEY, slug VARCHAR(50) NOT NULL UNIQUE, nombre VARCHAR(100) NOT NULL, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)`);
     try { await conn.execute('ALTER TABLE fotos ADD COLUMN descripcion TEXT'); } catch(e) {}
+    try { await conn.execute('ALTER TABLE fotos ADD COLUMN etiqueta VARCHAR(100)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN entregado TINYINT(1) DEFAULT 0'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_preference_id VARCHAR(255)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_payment_id VARCHAR(255)'); } catch(e) {}
@@ -254,7 +255,7 @@ app.post('/fs2026categoria-eliminar/:id', async (req, res) => {
 app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descarga'}]), async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
-    const { nombre, categoria, precio, descripcion } = req.body;
+    const { nombre, categoria, precio, descripcion, etiqueta } = req.body;
     if (!nombre || !categoria || !precio || parseFloat(precio) <= 0 || !req.files?.foto_galeria || !req.files?.foto_descarga)
       return res.status(400).json({ error: 'Faltan datos o el precio no es válido' });
     const galResult = await new Promise((resolve, reject) => {
@@ -264,7 +265,7 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
       cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_descarga[0].buffer);
     });
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion) VALUES (?, ?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null]);
+    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null, etiqueta || null]);
     await conn.end();
     res.json({ ok: true });
   } catch (err) {
@@ -273,13 +274,78 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
   }
 });
 
+app.post('/fs2026subir-multiple', upload.fields([
+  { name: 'foto_galeria_0' }, { name: 'foto_descarga_0' },
+  { name: 'foto_galeria_1' }, { name: 'foto_descarga_1' },
+  { name: 'foto_galeria_2' }, { name: 'foto_descarga_2' },
+  { name: 'foto_galeria_3' }, { name: 'foto_descarga_3' },
+  { name: 'foto_galeria_4' }, { name: 'foto_descarga_4' },
+  { name: 'foto_galeria_5' }, { name: 'foto_descarga_5' },
+  { name: 'foto_galeria_6' }, { name: 'foto_descarga_6' },
+  { name: 'foto_galeria_7' }, { name: 'foto_descarga_7' },
+  { name: 'foto_galeria_8' }, { name: 'foto_descarga_8' },
+  { name: 'foto_galeria_9' }, { name: 'foto_descarga_9' },
+  { name: 'foto_galeria_10' }, { name: 'foto_descarga_10' },
+  { name: 'foto_galeria_11' }, { name: 'foto_descarga_11' },
+  { name: 'foto_galeria_12' }, { name: 'foto_descarga_12' },
+  { name: 'foto_galeria_13' }, { name: 'foto_descarga_13' },
+  { name: 'foto_galeria_14' }, { name: 'foto_descarga_14' },
+  { name: 'foto_galeria_15' }, { name: 'foto_descarga_15' },
+  { name: 'foto_galeria_16' }, { name: 'foto_descarga_16' },
+  { name: 'foto_galeria_17' }, { name: 'foto_descarga_17' },
+  { name: 'foto_galeria_18' }, { name: 'foto_descarga_18' },
+  { name: 'foto_galeria_19' }, { name: 'foto_descarga_19' },
+]), async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const { categoria, precio, descripcion, etiqueta, nombreBase } = req.body;
+    if (!categoria || !precio || parseFloat(precio) <= 0)
+      return res.status(400).json({ error: 'Faltan datos o el precio no es válido' });
+    if (!req.files) return res.status(400).json({ error: 'No se recibieron archivos' });
+
+    const conn = await mysql.createConnection(dbConfig);
+    let subidas = 0;
+    let errores = 0;
+
+    for (let i = 0; i < 20; i++) {
+      const galFile = req.files[`foto_galeria_${i}`]?.[0];
+      const descFile = req.files[`foto_descarga_${i}`]?.[0];
+      if (!galFile || !descFile) continue;
+
+      try {
+        const galResult = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload_stream({ folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}_${i}` }, (err, result) => err ? reject(err) : resolve(result)).end(galFile.buffer);
+        });
+        const descResult = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}_${i}` }, (err, result) => err ? reject(err) : resolve(result)).end(descFile.buffer);
+        });
+        const nombreFoto = (nombreBase && nombreBase.trim())
+          ? `${nombreBase.trim()} ${i + 1}`
+          : (galFile.originalname ? galFile.originalname.replace(/\.[^/.]+$/, '') : `Foto ${i + 1}`);
+        await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombreFoto, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null, etiqueta || null]);
+        subidas++;
+      } catch (innerErr) {
+        console.error(`Error subiendo foto ${i}:`, innerErr.message);
+        errores++;
+      }
+    }
+    await conn.end();
+
+    if (subidas === 0) return res.status(400).json({ error: 'No se pudo subir ninguna foto' });
+    res.json({ ok: true, subidas, errores });
+  } catch (err) {
+    console.error('Error subiendo fotos múltiples:', err);
+    res.status(500).json({ error: 'Error subiendo fotos' });
+  }
+});
+
 app.post('/fs2026editar/:id', async (req, res) => {
   if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
   try {
-    const { nombre, categoria, precio, descripcion } = req.body;
+    const { nombre, categoria, precio, descripcion, etiqueta } = req.body;
     if (!nombre || !categoria || !precio || parseFloat(precio) <= 0) return res.status(400).json({ error: 'Datos inválidos' });
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute('UPDATE fotos SET nombre = ?, categoria = ?, precio = ?, descripcion = ? WHERE id = ?', [nombre, categoria, parseFloat(precio), descripcion || null, req.params.id]);
+    await conn.execute('UPDATE fotos SET nombre = ?, categoria = ?, precio = ?, descripcion = ?, etiqueta = ? WHERE id = ?', [nombre, categoria, parseFloat(precio), descripcion || null, etiqueta || null, req.params.id]);
     await conn.end();
     res.json({ ok: true });
   } catch (err) {
@@ -554,6 +620,12 @@ app.get('/fs2026fotos', async (req, res) => {
   .container{padding:24px 20px 60px;max-width:1100px;margin:0 auto}
   .upload-card{background:white;border-radius:16px;padding:28px;margin-bottom:28px;box-shadow:0 4px 16px rgba(4,52,44,0.07);border:1px solid #e8ece9}
   .upload-title{font-size:18px;font-weight:700;color:#04342C;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .upload-tabs{display:flex;gap:8px;margin-bottom:22px;border-bottom:2px solid #eef1f0}
+  .upload-tab{background:none;border:none;padding:10px 4px 14px;font-size:14px;font-weight:700;color:#9ca3af;cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px;margin-right:14px;transition:color 0.2s,border-color 0.2s}
+  .upload-tab:hover{color:#04342C}
+  .upload-tab.active{color:#04342C;border-bottom-color:#1D9E75}
+  .multi-file-list{margin-top:10px;font-size:11.5px;color:#04342C;font-weight:600;max-width:100%;max-height:90px;overflow-y:auto;text-align:left}
+  .multi-file-list div{padding:2px 0;border-bottom:1px solid #f1f3f2;word-break:break-all}
   .form-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
   .fg{display:flex;flex-direction:column;gap:7px}
   .fg label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.6px}
@@ -594,6 +666,7 @@ app.get('/fs2026fotos', async (req, res) => {
   .foto-id-badge{position:absolute;top:8px;left:8px;background:rgba(4,52,44,0.75);color:white;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;letter-spacing:0.5px;backdrop-filter:blur(4px)}
   .foto-info{padding:14px}
   .foto-nombre{font-size:14px;font-weight:700;color:#111827;margin-bottom:5px;line-height:1.3}
+  .foto-etiqueta{font-size:11px;color:#0d7a52;font-weight:600;margin-bottom:6px}
   .foto-meta-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .foto-cat-pill{font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:#e6f4ee;color:#0d7a52}
   .foto-precio{font-size:15px;font-weight:800;color:#04342C}
@@ -646,7 +719,11 @@ app.get('/fs2026fotos', async (req, res) => {
   </div>
 
   <div class="upload-card">
-    <div class="upload-title">📷 Subir nueva foto</div>
+    <div class="upload-tabs">
+      <button class="upload-tab active" id="tabIndividual" onclick="switchUploadTab('individual')">📷 Subir una foto</button>
+      <button class="upload-tab" id="tabMultiple" onclick="switchUploadTab('multiple')">📚 Subir varias fotos</button>
+    </div>
+
     <form id="uploadForm">
       <div class="form-grid">
         <div class="fg"><label>Nombre de la foto</label><input type="text" name="nombre" placeholder="Ej: Juan Pérez - Lanzamiento" required></div>
@@ -658,7 +735,11 @@ app.get('/fs2026fotos', async (req, res) => {
           <input type="number" name="precio" placeholder="1500" min="1" step="1" required>
           <div class="field-hint">Debe ser mayor a $0</div>
         </div>
-        <div></div>
+        <div class="fg">
+          <label>Etiqueta (opcional)</label>
+          <input type="text" name="etiqueta" placeholder="Ej: Corredor 22">
+          <div class="field-hint">Para agrupar y filtrar fotos relacionadas</div>
+        </div>
       </div>
       <div class="form-grid" style="margin-top:18px">
         <div class="fg" style="grid-column:1/-1">
@@ -678,6 +759,43 @@ app.get('/fs2026fotos', async (req, res) => {
       </div>
       <button class="btn-subir" type="submit" id="btnSubir">Subir foto</button>
     </form>
+
+    <form id="uploadFormMultiple" style="display:none">
+      <div class="form-grid">
+        <div class="fg"><label>Nombre base (opcional)</label><input type="text" name="nombreBase" placeholder="Ej: Corredor 22 — se numeran automático"></div>
+        <div class="fg"><label>Categoría</label><select name="categoria" id="uploadCatSelectMulti">${catOptionsHTML(null)}</select></div>
+      </div>
+      <div class="form-grid" style="margin-top:18px">
+        <div class="fg">
+          <label>Precio para todo el lote ($ ARS)</label>
+          <input type="number" name="precio" placeholder="1500" min="1" step="1" required>
+          <div class="field-hint">Mismo precio para todas las fotos subidas</div>
+        </div>
+        <div class="fg">
+          <label>Etiqueta (opcional)</label>
+          <input type="text" name="etiqueta" placeholder="Ej: Corredor 22">
+          <div class="field-hint">Para que el comprador filtre por esta etiqueta</div>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:18px">
+        <div class="fg" style="grid-column:1/-1">
+          <label>Descripción para todo el lote (opcional)</label>
+          <input type="text" name="descripcion" placeholder="Ej: Tomadas durante la jornada del sábado">
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:18px">
+        <div class="fg">
+          <label>Fotos con marca de agua (galería)</label>
+          <div class="file-input-wrap" id="wrapMulti1"><input type="file" name="fotos_galeria" accept="image/*" multiple onchange="showMultiPreview(this,'multi1')" required><div class="file-icon">🖼️</div><div class="file-label">Tocá y elegí varias fotos</div><div class="file-sublabel">Se muestran en la galería</div><div class="multi-file-list" id="multi1"></div></div>
+        </div>
+        <div class="fg">
+          <label>Fotos sin marca de agua (descarga)</label>
+          <div class="file-input-wrap" id="wrapMulti2"><input type="file" name="fotos_descarga" accept="image/*" multiple onchange="showMultiPreview(this,'multi2')" required><div class="file-icon">⬇️</div><div class="file-label">Tocá y elegí varias fotos</div><div class="file-sublabel">Se mandan al comprador</div><div class="multi-file-list" id="multi2"></div></div>
+        </div>
+      </div>
+      <div class="field-hint" style="margin-top:6px;text-align:center">⚠️ Elegí los archivos en el mismo orden en ambos campos (foto 1 con foto 1, foto 2 con foto 2, etc.)</div>
+      <button class="btn-subir" type="submit" id="btnSubirMulti">Subir todas las fotos</button>
+    </form>
   </div>
 
   <div class="gallery-header">
@@ -693,6 +811,7 @@ app.get('/fs2026fotos', async (req, res) => {
       </div>
       <div class="foto-info">
         <div class="foto-nombre" id="nombre-${f.id}">${f.nombre}</div>
+        ${f.etiqueta ? `<div class="foto-etiqueta" id="etq-${f.id}">🏷 ${f.etiqueta}</div>` : `<div class="foto-etiqueta" id="etq-${f.id}" style="display:none"></div>`}
         <div class="foto-meta-row">
           <span class="foto-cat-pill" id="cat-${f.id}" data-cat="${f.categoria}">${catMap[f.categoria] || f.categoria}</span>
           <span class="foto-precio" id="precio-${f.id}">$ ${parseFloat(f.precio).toLocaleString('es-AR')}</span>
@@ -708,6 +827,7 @@ app.get('/fs2026fotos', async (req, res) => {
           <select id="edit-cat-${f.id}" class="edit-cat-select">${catOptionsHTML(f.categoria)}</select>
         </div>
         <div class="fg"><label>Precio</label><input type="number" id="edit-precio-${f.id}" value="${f.precio}" min="1" step="1"></div>
+        <div class="fg"><label>Etiqueta</label><input type="text" id="edit-etq-${f.id}" value="${f.etiqueta || ''}" placeholder="Ej: Corredor 22"></div>
         <div class="fg"><label>Descripción</label><input type="text" id="edit-desc-${f.id}" value="${f.descripcion || ''}" placeholder="Opcional"></div>
         <div class="edit-actions">
           <button class="btn-guardar" onclick="guardarEdit(${f.id})">Guardar</button>
@@ -785,6 +905,7 @@ function fotoCardHTML(f, displayNum) {
   html += '</div>';
   html += '<div class="foto-info">';
   html += '<div class="foto-nombre" id="nombre-' + f.id + '">' + f.nombre + '</div>';
+  html += f.etiqueta ? ('<div class="foto-etiqueta" id="etq-' + f.id + '">\ud83c\udff7 ' + f.etiqueta + '</div>') : ('<div class="foto-etiqueta" id="etq-' + f.id + '" style="display:none"></div>');
   html += '<div class="foto-meta-row">';
   html += '<span class="foto-cat-pill" id="cat-' + f.id + '" data-cat="' + f.categoria + '">' + catLabel + '</span>';
   html += '<span class="foto-precio" id="precio-' + f.id + '">$ ' + parseFloat(f.precio).toLocaleString('es-AR') + '</span>';
@@ -800,6 +921,7 @@ function fotoCardHTML(f, displayNum) {
   html += '<select id="edit-cat-' + f.id + '" class="edit-cat-select">' + catOptionsHTML(f.categoria) + '</select>';
   html += '</div>';
   html += '<div class="fg"><label>Precio</label><input type="number" id="edit-precio-' + f.id + '" value="' + f.precio + '" min="1" step="1"></div>';
+  html += '<div class="fg"><label>Etiqueta</label><input type="text" id="edit-etq-' + f.id + '" value="' + (f.etiqueta || '') + '" placeholder="Ej: Corredor 22"></div>';
   html += '<div class="fg"><label>Descripci\u00f3n</label><input type="text" id="edit-desc-' + f.id + '" value="' + (f.descripcion || '') + '" placeholder="Opcional"></div>';
   html += '<div class="edit-actions">';
   html += '<button class="btn-guardar" onclick="guardarEdit(' + f.id + ')">Guardar</button>';
@@ -919,13 +1041,14 @@ function guardarEdit(id){
   const nombre=document.getElementById('edit-nombre-'+id).value.trim();
   const categoria=document.getElementById('edit-cat-'+id).value;
   const precio=document.getElementById('edit-precio-'+id).value;
+  const etiqueta=document.getElementById('edit-etq-'+id).value.trim();
   const descripcion=document.getElementById('edit-desc-'+id).value.trim();
   if(!nombre){alert('El nombre no puede estar vacío');return;}
   if(!precio || parseFloat(precio) <= 0){alert('El precio debe ser mayor a $0');return;}
   fetch('/fs2026editar/'+id,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({nombre:nombre,categoria:categoria,precio:precio,descripcion:descripcion})
+    body:JSON.stringify({nombre:nombre,categoria:categoria,precio:precio,descripcion:descripcion,etiqueta:etiqueta})
   })
     .then(function(res){ return res.json(); })
     .then(function(data){
@@ -935,12 +1058,98 @@ function guardarEdit(id){
         catEl.textContent=CAT_MAP[categoria]||categoria;
         catEl.dataset.cat=categoria;
         document.getElementById('precio-'+id).textContent='$ '+parseFloat(precio).toLocaleString('es-AR');
+        const etqEl=document.getElementById('etq-'+id);
+        if(etiqueta){ etqEl.textContent='🏷 '+etiqueta; etqEl.style.display='block'; }
+        else { etqEl.textContent=''; etqEl.style.display='none'; }
         toggleEdit(id);
       } else {
         alert('Error al guardar: '+(data.error||''));
       }
     });
 }
+
+function switchUploadTab(tab){
+  const formInd=document.getElementById('uploadForm');
+  const formMulti=document.getElementById('uploadFormMultiple');
+  const tabInd=document.getElementById('tabIndividual');
+  const tabMulti=document.getElementById('tabMultiple');
+  if(tab==='individual'){
+    formInd.style.display='block'; formMulti.style.display='none';
+    tabInd.classList.add('active'); tabMulti.classList.remove('active');
+  } else {
+    formInd.style.display='none'; formMulti.style.display='block';
+    tabInd.classList.remove('active'); tabMulti.classList.add('active');
+  }
+}
+
+function showMultiPreview(input,listId){
+  const list=document.getElementById(listId);
+  const files=Array.from(input.files||[]);
+  if(files.length===0){ list.innerHTML=''; return; }
+  list.innerHTML=files.map(function(f,i){ return '<div>'+(i+1)+'. '+f.name+'</div>'; }).join('');
+}
+
+document.getElementById('uploadFormMultiple').addEventListener('submit',function(e){
+  e.preventDefault();
+  const form=e.target;
+  const precioInput=form.querySelector('input[name="precio"]');
+  const msg=document.getElementById('msg');
+  const galInput=form.querySelector('input[name="fotos_galeria"]');
+  const descInput=form.querySelector('input[name="fotos_descarga"]');
+  const galFiles=Array.from(galInput.files||[]);
+  const descFiles=Array.from(descInput.files||[]);
+
+  if(parseFloat(precioInput.value)<=0||!precioInput.value){
+    msg.className='msg err'; msg.textContent='El precio debe ser mayor a $0'; precioInput.focus(); return;
+  }
+  if(galFiles.length===0||descFiles.length===0){
+    msg.className='msg err'; msg.textContent='Elegí al menos un par de fotos (galería y descarga)'; return;
+  }
+  if(galFiles.length!==descFiles.length){
+    msg.className='msg err'; msg.textContent='La cantidad de fotos de galería ('+galFiles.length+') no coincide con la de descarga ('+descFiles.length+')'; return;
+  }
+  if(galFiles.length>20){
+    msg.className='msg err'; msg.textContent='Máximo 20 fotos por lote'; return;
+  }
+
+  const fd=new FormData();
+  fd.append('categoria', form.querySelector('select[name="categoria"]').value);
+  fd.append('precio', precioInput.value);
+  fd.append('etiqueta', form.querySelector('input[name="etiqueta"]').value);
+  fd.append('descripcion', form.querySelector('input[name="descripcion"]').value);
+  fd.append('nombreBase', form.querySelector('input[name="nombreBase"]').value);
+  galFiles.forEach(function(f,i){ fd.append('foto_galeria_'+i, f); });
+  descFiles.forEach(function(f,i){ fd.append('foto_descarga_'+i, f); });
+
+  const btn=document.getElementById('btnSubirMulti');
+  btn.disabled=true; btn.textContent='Subiendo '+galFiles.length+' fotos...';
+  msg.className='msg'; msg.textContent='';
+
+  fetch('/fs2026subir-multiple',{method:'POST',body:fd})
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if(data.ok){
+        msg.className='msg ok';
+        msg.textContent='✓ '+data.subidas+' foto(s) subida(s) correctamente.'+(data.errores>0?(' ('+data.errores+' con error)'):'');
+        form.reset();
+        document.getElementById('multi1').innerHTML='';
+        document.getElementById('multi2').innerHTML='';
+        return refrescarGaleria().then(function(){
+          setTimeout(function(){ msg.className='msg'; msg.textContent=''; }, 4500);
+        });
+      } else {
+        msg.className='msg err';
+        msg.textContent='Error: '+(data.error||'No se pudo subir');
+      }
+    })
+    .catch(function(){
+      msg.className='msg err';
+      msg.textContent='Error de conexión.';
+    })
+    .finally(function(){
+      btn.disabled=false; btn.textContent='Subir todas las fotos';
+    });
+});
 </script>
 </body></html>`);
   } catch (err) { res.status(500).send('Error'); }

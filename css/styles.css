@@ -52,6 +52,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .filter-bar{display:flex;gap:6px;flex-wrap:wrap}
 .fbtn{padding:6px 14px;font-size:12px;border:1px solid rgba(4,52,44,0.15);background:transparent;color:var(--txt2);border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
 .fbtn.active,.fbtn:hover{background:var(--v0);color:var(--crema);border-color:var(--v0)}
+.tag-filter-bar{display:flex;gap:6px;flex-wrap:wrap}
+.tag-filter-bar .fbtn{border-style:dashed}
 
 /* ── GALLERY GRID ── */
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;width:100%;overflow-y:auto;padding-bottom:20px}

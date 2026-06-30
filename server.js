@@ -84,7 +84,7 @@ async function enviarEmail({ to, subject, html }) {
   }
 }
 
-const LOGO_URL = `${process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:8080'}/assets/logo.jpg`;
+const LOGO_URL = `${process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:8080'}/assets/logo.jpeg`;
 
 function emailFotosHTML({ nombreComprador, fotos }) {
   const fotosHtml = fotos.map(f => `
@@ -633,7 +633,7 @@ app.get('/fs2026admin', (req, res) => {
 </style></head>
 <body><div class="card">
   <div class="logo">
-    <img src="/assets/logo.jpg" style="width:120px;height:120px;object-fit:contain;margin-bottom:12px">
+    <img src="/assets/logo.jpeg" style="width:120px;height:120px;object-fit:contain;margin-bottom:12px">
     <h1>FocoSalvaje</h1>
     <p>Panel de administración</p>
   </div>

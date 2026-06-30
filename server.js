@@ -1427,7 +1427,25 @@ app.get('/fs2026pedidos', async (req, res) => {
   .page-btn{padding:7px 13px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:500;border:1.5px solid #e5e7eb;color:#374151;background:white;transition:all 0.2s}
   .page-btn.active{background:#04342C;color:white;border-color:#04342C}
   .empty{text-align:center;padding:60px 20px;color:#9ca3af}
-  @media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.container{padding:12px}}
+  .pedido-card{display:none}
+  @media(max-width:700px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .container{padding:12px}
+    .table-wrap .table-scroll{display:none}
+    .table-wrap .pagination-wrap-desktop{display:none}
+    .pedido-card{display:block;background:white;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #eef1f0}
+    .pedido-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+    .pedido-card-num{font-size:11px;color:#9ca3af;font-weight:700;letter-spacing:0.5px}
+    .pedido-card-nombre{font-size:15px;font-weight:700;color:#111827;margin-top:2px}
+    .pedido-card-email{font-size:12.5px;color:#6b7280;word-break:break-all;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .pedido-card-email button{border:none;background:none;cursor:pointer;font-size:11px;color:#1d5e8c;padding:0}
+    .pedido-card-fotos{font-size:12.5px;color:#374151;line-height:1.5;background:#f7f9f8;padding:10px 12px;border-radius:8px;margin-bottom:10px}
+    .pedido-card-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+    .pedido-card-total{font-size:16px;font-weight:800;color:#04342C}
+    .pedido-card-fecha{font-size:11.5px;color:#9ca3af}
+    .pedido-card-btns{display:flex;gap:8px;flex-wrap:wrap}
+    .pedido-card-btns button{flex:1;min-width:80px;border:none;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  }
   @media(max-width:480px){.navbar{padding:12px 14px}.navbar-brand{font-size:14px}.navbar-links{gap:6px}.nav-link{padding:6px 10px;font-size:11.5px}}
 </style></head>
 <body>
@@ -1463,6 +1481,35 @@ app.get('/fs2026pedidos', async (req, res) => {
     <div class="results">Total: <strong>$ ${filtered.reduce((s,r)=>s+parseFloat(r.total),0).toLocaleString('es-AR')}</strong></div>
   </div>
   ${paginated.length === 0 ? `<div class="table-wrap"><div class="empty"><div style="font-size:48px;margin-bottom:12px">🔍</div><div>No hay pedidos con esos filtros</div></div></div>` : `
+  <div id="pedidoCards">
+  ${paginated.map(r => `<div class="pedido-card" id="pedido-card-${r.id}">
+    <div class="pedido-card-top">
+      <div>
+        <div class="pedido-card-num">#${r.displayNum}</div>
+        <div class="pedido-card-nombre">${r.nombre}</div>
+        <div class="pedido-card-email">
+          <span id="email-card-${r.id}">${r.email}</span>
+          <button onclick="toggleEmailEdit(${r.id})">✏️</button>
+        </div>
+        <div id="email-edit-card-${r.id}" style="display:none;margin-top:6px">
+          <input type="email" id="email-input-card-${r.id}" value="${r.email}" style="font-size:12px;padding:5px 7px;border:1px solid #e5e7eb;border-radius:6px;width:160px">
+          <button onclick="guardarEmailCard(${r.id})" style="border:none;background:#04342C;color:white;padding:5px 9px;border-radius:6px;cursor:pointer;font-size:11px;">OK</button>
+        </div>
+      </div>
+      <span class="badge ${r.estado}">${r.estado}</span>
+    </div>
+    <div class="pedido-card-fotos">📷 ${r.fotos}</div>
+    <div class="pedido-card-meta">
+      <div class="pedido-card-total">$ ${parseFloat(r.total).toLocaleString('es-AR')}</div>
+      <div class="pedido-card-fecha">${new Date(r.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})}</div>
+    </div>
+    <div class="pedido-card-btns">
+      <button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button>
+      <button onclick="reenviarFotos(${r.id})" style="background:#e0f2fe;color:#075985;">📧 Reenviar</button>
+      <button onclick="eliminarPedido(${r.id})" style="background:#fee2e2;color:#991b1b;">🗑 Eliminar</button>
+    </div>
+  </div>`).join('')}
+  </div>
   <div class="table-wrap">
     <div class="table-scroll">
       <table>
@@ -1501,7 +1548,9 @@ app.get('/fs2026pedidos', async (req, res) => {
 <script>
 function toggleEmailEdit(id){
   const div=document.getElementById('email-edit-'+id);
-  div.style.display = div.style.display==='none' ? 'block' : 'none';
+  if(div) div.style.display = div.style.display==='none' ? 'block' : 'none';
+  const divCard=document.getElementById('email-edit-card-'+id);
+  if(divCard) divCard.style.display = divCard.style.display==='none' ? 'block' : 'none';
 }
 async function guardarEmail(id){
   const nuevoEmail=document.getElementById('email-input-'+id).value.trim();
@@ -1514,6 +1563,26 @@ async function guardarEmail(id){
   const data=await res.json();
   if(data.ok){
     document.getElementById('email-'+id).textContent=nuevoEmail;
+    const cardEmail=document.getElementById('email-card-'+id);
+    if(cardEmail) cardEmail.textContent=nuevoEmail;
+    toggleEmailEdit(id);
+  } else {
+    alert('Error: '+(data.error||'No se pudo guardar'));
+  }
+}
+async function guardarEmailCard(id){
+  const nuevoEmail=document.getElementById('email-input-card-'+id).value.trim();
+  if(!nuevoEmail||!nuevoEmail.includes('@')){alert('Ingresá un email válido');return;}
+  const res=await fetch('/fs2026editar-email/'+id,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:nuevoEmail})
+  });
+  const data=await res.json();
+  if(data.ok){
+    const tableEmail=document.getElementById('email-'+id);
+    if(tableEmail) tableEmail.textContent=nuevoEmail;
+    document.getElementById('email-card-'+id).textContent=nuevoEmail;
     toggleEmailEdit(id);
   } else {
     alert('Error: '+(data.error||'No se pudo guardar'));
@@ -1523,7 +1592,12 @@ async function eliminarPedido(id){
   if(!confirm('¿Eliminar este pedido?'))return;
   const res=await fetch('/fs2026eliminar-pedido/'+id,{method:'POST'});
   const data=await res.json();
-  if(data.ok)document.getElementById('pedido-'+id).remove();
+  if(data.ok){
+    const tr=document.getElementById('pedido-'+id);
+    if(tr) tr.remove();
+    const card=document.getElementById('pedido-card-'+id);
+    if(card) card.remove();
+  }
 }
 async function reenviarFotos(id){
   if(!confirm('¿Reenviar las fotos de este pedido por email? El pedido se marcará como exitoso.'))return;
@@ -1538,8 +1612,12 @@ async function reenviarFotos(id){
 async function toggleEntregar(id,btn){
   const res=await fetch('/fs2026entregar/'+id,{method:'POST'});
   const data=await res.json();
-  if(data.entregado){btn.textContent='✓ Entregado';btn.className='btn-entregar si';}
-  else{btn.textContent='Entregar';btn.className='btn-entregar no';}
+  const newText=data.entregado?'✓ Entregado':'Entregar';
+  const newClass='btn-entregar '+(data.entregado?'si':'no');
+  const tableBtn=document.querySelector('#pedido-'+id+' .btn-entregar');
+  if(tableBtn){ tableBtn.textContent=newText; tableBtn.className=newClass; }
+  const cardBtn=document.querySelector('#pedido-card-'+id+' .btn-entregar');
+  if(cardBtn){ cardBtn.textContent=newText; cardBtn.className=newClass; }
 }
 </script>
 </body></html>`);

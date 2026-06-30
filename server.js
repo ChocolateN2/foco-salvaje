@@ -5,7 +5,7 @@ const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const mysql = require('mysql2/promise');
 const path = require('path');
 const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const app = express();
 app.use(cors());
@@ -20,11 +20,27 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 8 }
 }));
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
 });
+const R2_BUCKET = process.env.R2_BUCKET_NAME;
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+
+async function subirAR2(buffer, mimetype, folder, filename) {
+  const key = `${folder}/${filename}`;
+  await r2.send(new PutObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: mimetype || 'image/jpeg',
+  }));
+  return `${R2_PUBLIC_URL}/${key}`;
+}
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -258,14 +274,15 @@ app.post('/fs2026subir', upload.fields([{name:'foto_galeria'},{name:'foto_descar
     const { nombre, categoria, precio, descripcion, etiqueta } = req.body;
     if (!nombre || !categoria || !precio || parseFloat(precio) <= 0 || !req.files?.foto_galeria || !req.files?.foto_descarga)
       return res.status(400).json({ error: 'Faltan datos o el precio no es válido' });
-    const galResult = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream({ folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_galeria[0].buffer);
-    });
-    const descResult = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}` }, (err, result) => err ? reject(err) : resolve(result)).end(req.files.foto_descarga[0].buffer);
-    });
+
+    const galFile = req.files.foto_galeria[0];
+    const descFile = req.files.foto_descarga[0];
+    const ts = Date.now();
+    const galUrl = await subirAR2(galFile.buffer, galFile.mimetype, 'galeria', `gal_${ts}.jpg`);
+    const descUrl = await subirAR2(descFile.buffer, descFile.mimetype, 'descarga', `desc_${ts}.jpg`);
+
     const conn = await mysql.createConnection(dbConfig);
-    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null, etiqueta || null]);
+    await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombre, categoria, parseFloat(precio), galUrl, descUrl, descripcion || null, etiqueta || null]);
     await conn.end();
     res.json({ ok: true });
   } catch (err) {
@@ -313,16 +330,13 @@ app.post('/fs2026subir-multiple', upload.fields([
       if (!galFile || !descFile) continue;
 
       try {
-        const galResult = await new Promise((resolve, reject) => {
-          cloudinary.uploader.upload_stream({ folder: 'focosalvaje/galeria', public_id: `gal_${Date.now()}_${i}` }, (err, result) => err ? reject(err) : resolve(result)).end(galFile.buffer);
-        });
-        const descResult = await new Promise((resolve, reject) => {
-          cloudinary.uploader.upload_stream({ folder: 'focosalvaje/descarga', public_id: `desc_${Date.now()}_${i}` }, (err, result) => err ? reject(err) : resolve(result)).end(descFile.buffer);
-        });
+        const ts = Date.now();
+        const galUrl = await subirAR2(galFile.buffer, galFile.mimetype, 'galeria', `gal_${ts}_${i}.jpg`);
+        const descUrl = await subirAR2(descFile.buffer, descFile.mimetype, 'descarga', `desc_${ts}_${i}.jpg`);
         const nombreFoto = (nombreBase && nombreBase.trim())
           ? `${nombreBase.trim()} — Foto ${i + 1}`
           : (galFile.originalname ? galFile.originalname.replace(/\.[^/.]+$/, '') : `Foto ${i + 1}`);
-        await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombreFoto, categoria, parseFloat(precio), galResult.secure_url, descResult.secure_url, descripcion || null, etiqueta || null]);
+        await conn.execute('INSERT INTO fotos (nombre, categoria, precio, url_galeria, url_descarga, descripcion, etiqueta) VALUES (?, ?, ?, ?, ?, ?, ?)', [nombreFoto, categoria, parseFloat(precio), galUrl, descUrl, descripcion || null, etiqueta || null]);
         subidas++;
       } catch (innerErr) {
         console.error(`Error subiendo foto ${i}:`, innerErr.message);

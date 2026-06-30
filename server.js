@@ -689,7 +689,7 @@ app.get('/fs2026fotos', async (req, res) => {
 <title>Subir fotos — Foco Salvaje</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937}
+  body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937;overflow-x:hidden}
   .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:10}
   .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -739,10 +739,11 @@ app.get('/fs2026fotos', async (req, res) => {
   .msg.ok{background:#e3f7ee;color:#0a6b46;display:block;border:1px solid #b9e8d2}
   .msg.err{background:#fdecec;color:#b3261e;display:block;border:1px solid #f8c9c9}
   @media(max-width:700px){.form-grid{grid-template-columns:1fr}.container{padding:16px 12px 50px}.upload-card{padding:20px}.cat-manager{flex-direction:column;align-items:stretch}}
+  @media(max-width:480px){.navbar{padding:12px 14px}.navbar-brand{font-size:14px}.navbar-links{gap:6px}.nav-link{padding:6px 10px;font-size:11.5px}}
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover">Foco Salvaje</div>
+  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0">Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link active" href="/fs2026fotos">📤 Subir fotos</a>
     <a class="nav-link" href="/fs2026galeria">🖼️ Galería</a>
@@ -1055,7 +1056,7 @@ app.get('/fs2026galeria', async (req, res) => {
 <title>Galería — Foco Salvaje</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937}
+  body{font-family:'Segoe UI',-apple-system,sans-serif;background:#eef1f0;min-height:100vh;color:#1f2937;overflow-x:hidden}
   .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:10}
   .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -1106,11 +1107,12 @@ app.get('/fs2026galeria', async (req, res) => {
   .btn-cancelar{flex:1;background:#e5e7eb;color:#374151;border:none;padding:9px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
   .btn-cancelar:hover{background:#d1d5db}
   @media(max-width:700px){.fotos-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px 12px 50px}}
+  @media(max-width:480px){.navbar{padding:12px 14px}.navbar-brand{font-size:14px}.navbar-links{gap:6px}.nav-link{padding:6px 10px;font-size:11.5px}}
   @media(max-width:420px){.fotos-grid{grid-template-columns:1fr}}
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover">Foco Salvaje</div>
+  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0">Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link" href="/fs2026fotos">📤 Subir fotos</a>
     <a class="nav-link active" href="/fs2026galeria">🖼️ Galería</a>
@@ -1381,7 +1383,7 @@ app.get('/fs2026pedidos', async (req, res) => {
 <title>Pedidos — Foco Salvaje</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',sans-serif;background:#f0f4f3;min-height:100vh}
+  body{font-family:'Segoe UI',sans-serif;background:#f0f4f3;min-height:100vh;overflow-x:hidden}
   .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px}
   .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -1426,10 +1428,11 @@ app.get('/fs2026pedidos', async (req, res) => {
   .page-btn.active{background:#04342C;color:white;border-color:#04342C}
   .empty{text-align:center;padding:60px 20px;color:#9ca3af}
   @media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.container{padding:12px}}
+  @media(max-width:480px){.navbar{padding:12px 14px}.navbar-brand{font-size:14px}.navbar-links{gap:6px}.nav-link{padding:6px 10px;font-size:11.5px}}
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover">Foco Salvaje</div>
+  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0">Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link" href="/fs2026fotos">📤 Subir fotos</a>
     <a class="nav-link" href="/fs2026galeria">🖼️ Galería</a>

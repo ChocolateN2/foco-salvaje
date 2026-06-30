@@ -742,7 +742,7 @@ app.get('/fs2026fotos', async (req, res) => {
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand">🎣 Foco Salvaje</div>
+  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover">Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link active" href="/fs2026fotos">📤 Subir fotos</a>
     <a class="nav-link" href="/fs2026galeria">🖼️ Galería</a>
@@ -1110,7 +1110,7 @@ app.get('/fs2026galeria', async (req, res) => {
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand">🎣 Foco Salvaje</div>
+  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover">Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link" href="/fs2026fotos">📤 Subir fotos</a>
     <a class="nav-link active" href="/fs2026galeria">🖼️ Galería</a>
@@ -1383,7 +1383,7 @@ app.get('/fs2026pedidos', async (req, res) => {
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',sans-serif;background:#f0f4f3;min-height:100vh}
   .navbar{background:linear-gradient(135deg,#04342C,#0F6E56);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);flex-wrap:wrap;gap:10px}
-  .navbar-brand{color:white;font-size:17px;font-weight:700}
+  .navbar-brand{color:white;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
   .navbar-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .nav-link{color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;border:1px solid rgba(255,255,255,0.3);padding:6px 14px;border-radius:6px}
   .nav-link:hover{background:rgba(255,255,255,0.1);color:white}
@@ -1429,7 +1429,7 @@ app.get('/fs2026pedidos', async (req, res) => {
 </style></head>
 <body>
 <div class="navbar">
-  <div class="navbar-brand">🎣 Foco Salvaje</div>
+  <div class="navbar-brand"><img src="/assets/logo.jpeg" alt="Foco Salvaje" style="width:28px;height:28px;border-radius:50%;object-fit:cover">Foco Salvaje</div>
   <div class="navbar-links">
     <a class="nav-link" href="/fs2026fotos">📤 Subir fotos</a>
     <a class="nav-link" href="/fs2026galeria">🖼️ Galería</a>

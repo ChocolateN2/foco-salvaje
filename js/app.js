@@ -297,6 +297,119 @@ async function checkout(){
 
 function showToast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 
+let datosBancarios = null;
+
+async function abrirModalTransferencia(){
+  if(cart.length===0)return;
+
+  const name=document.getElementById('buyerName').value.trim();
+  const email=document.getElementById('buyerEmail').value.trim();
+  if(!name){
+    document.getElementById('buyerName').focus();
+    document.getElementById('buyerName').style.borderColor='#c0392b';
+    showToast('Ingresá tu nombre para continuar');
+    return;
+  }
+  if(!email||!email.includes('@')){
+    document.getElementById('buyerEmail').focus();
+    document.getElementById('buyerEmail').style.borderColor='#c0392b';
+    showToast('Ingresá un email válido para continuar');
+    return;
+  }
+  document.getElementById('buyerName').style.borderColor='';
+  document.getElementById('buyerEmail').style.borderColor='';
+
+  if(!datosBancarios){
+    try{
+      const res=await fetch('/api/datos-bancarios');
+      datosBancarios=await res.json();
+    } catch(e){
+      showToast('No se pudieron cargar los datos bancarios');
+      return;
+    }
+  }
+
+  document.getElementById('transfTitular').textContent=datosBancarios.titular;
+  document.getElementById('transfCbu').textContent=datosBancarios.cbu;
+  document.getElementById('transfAlias').textContent=datosBancarios.alias;
+  document.getElementById('transfBanco').textContent=datosBancarios.banco;
+  const total=cart.reduce((s,i)=>s+i.price,0);
+  document.getElementById('transfMonto').textContent='$ '+total.toLocaleString('es-AR');
+
+  document.getElementById('transfComprobante').value='';
+  document.getElementById('transfUploadLabel').textContent='Tocá para subir el comprobante';
+  document.getElementById('transfMsg').className='transf-msg';
+  document.getElementById('transfMsg').textContent='';
+
+  document.getElementById('transfModal').classList.add('open');
+}
+
+function cerrarModalTransferencia(){
+  document.getElementById('transfModal').classList.remove('open');
+}
+
+function copiarTransf(elId){
+  const text=document.getElementById(elId).textContent;
+  navigator.clipboard.writeText(text).then(()=>{
+    showToast('Copiado al portapapeles');
+  }).catch(()=>{
+    showToast('No se pudo copiar');
+  });
+}
+
+function mostrarNombreComprobante(){
+  const input=document.getElementById('transfComprobante');
+  const file=input.files[0];
+  document.getElementById('transfUploadLabel').textContent=file?file.name:'Tocá para subir el comprobante';
+}
+
+async function enviarPedidoTransferencia(){
+  const fileInput=document.getElementById('transfComprobante');
+  const msg=document.getElementById('transfMsg');
+
+  if(!fileInput.files[0]){
+    msg.className='transf-msg err';
+    msg.textContent='Subí el comprobante de la transferencia para continuar';
+    return;
+  }
+
+  const name=document.getElementById('buyerName').value.trim();
+  const email=document.getElementById('buyerEmail').value.trim();
+
+  const btn=document.getElementById('transfConfirmarBtn');
+  btn.disabled=true;
+  btn.textContent='Enviando...';
+  msg.className='transf-msg';
+  msg.textContent='';
+
+  try{
+    const fd=new FormData();
+    fd.append('items', JSON.stringify(cart));
+    fd.append('buyerName', name);
+    fd.append('buyerEmail', email);
+    fd.append('comprobante', fileInput.files[0]);
+
+    const res=await fetch('/crear-pedido-transferencia',{method:'POST',body:fd});
+    const data=await res.json();
+
+    if(data.ok){
+      cart=[];
+      updateCartUI();
+      cerrarModalTransferencia();
+      goTo('galeria');
+      showToast('✓ Comprobante enviado. Te avisamos por email cuando confirmemos el pago.');
+    } else {
+      msg.className='transf-msg err';
+      msg.textContent='Error: '+(data.error||'No se pudo enviar');
+    }
+  } catch(e){
+    msg.className='transf-msg err';
+    msg.textContent='Error de conexión. Intentá de nuevo.';
+  }
+  btn.disabled=false;
+  btn.textContent='Ya transferí, enviar comprobante';
+}
+
 async function enviarContacto(){
   const nombre=document.getElementById('contactNombre').value.trim();
   const email=document.getElementById('contactEmail').value.trim();

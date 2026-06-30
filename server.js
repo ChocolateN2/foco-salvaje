@@ -181,6 +181,8 @@ async function initDB() {
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN entregado TINYINT(1) DEFAULT 0'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_preference_id VARCHAR(255)'); } catch(e) {}
     try { await conn.execute('ALTER TABLE pedidos ADD COLUMN mp_payment_id VARCHAR(255)'); } catch(e) {}
+    try { await conn.execute('ALTER TABLE pedidos ADD COLUMN metodo_pago VARCHAR(30) DEFAULT "mercadopago"'); } catch(e) {}
+    try { await conn.execute('ALTER TABLE pedidos ADD COLUMN comprobante_url VARCHAR(500)'); } catch(e) {}
     const [catCount] = await conn.execute('SELECT COUNT(*) as c FROM categorias');
     if (catCount[0].c === 0) {
       const defaults = [
@@ -424,6 +426,82 @@ app.post('/crear-preferencia', async (req, res) => {
   } catch (error) {
     console.error('Error al crear preferencia:', error);
     res.status(500).json({ error: 'Error al procesar el pago' });
+  }
+});
+
+// === DATOS BANCARIOS (placeholder, reemplazar con los datos reales) ===
+const DATOS_BANCARIOS = {
+  titular: 'Juan Pérez',
+  cbu: '0000003100000000000000',
+  alias: 'FOCO.SALVAJE.MZA',
+  banco: 'Banco Ejemplo',
+};
+
+app.get('/api/datos-bancarios', (req, res) => {
+  res.json(DATOS_BANCARIOS);
+});
+
+app.post('/crear-pedido-transferencia', upload.single('comprobante'), async (req, res) => {
+  try {
+    const { items, buyerName, buyerEmail } = req.body;
+    if (!buyerName || !buyerEmail || !items) return res.status(400).json({ error: 'Faltan datos' });
+    if (!req.file) return res.status(400).json({ error: 'Falta subir el comprobante' });
+
+    const parsedItems = JSON.parse(items);
+    const fotos = parsedItems.map(i => i.name).join(', ');
+    const total = parsedItems.reduce((s, i) => s + i.price, 0);
+
+    const ts = Date.now();
+    const comprobanteUrl = await subirAR2(req.file.buffer, req.file.mimetype, 'comprobantes', `comp_${ts}.jpg`);
+
+    const conn = await mysql.createConnection(dbConfig);
+    const [result] = await conn.execute(
+      'INSERT INTO pedidos (nombre, email, fotos, total, estado, metodo_pago, comprobante_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [buyerName, buyerEmail, fotos, total, 'pendiente_verificacion', 'transferencia', comprobanteUrl]
+    );
+    await conn.end();
+
+    const htmlAviso = `
+      <h2>📥 Nuevo pedido por transferencia — Foco Salvaje</h2>
+      <p><strong>Nombre:</strong> ${buyerName}</p>
+      <p><strong>Email:</strong> ${buyerEmail}</p>
+      <p><strong>Fotos:</strong> ${fotos}</p>
+      <p><strong>Total:</strong> $ ${total.toLocaleString('es-AR')}</p>
+      <p><strong>Comprobante:</strong> <a href="${comprobanteUrl}" target="_blank">Ver comprobante</a></p>
+      <p>Revisá que la transferencia haya llegado y confirmá el pedido desde el panel de Pedidos.</p>
+    `;
+    await enviarEmail({ to: NOTIFY_EMAIL, subject: `Nuevo pedido por transferencia — ${buyerName}`, html: htmlAviso });
+
+    res.json({ ok: true, pedidoId: result.insertId });
+  } catch (err) {
+    console.error('Error creando pedido por transferencia:', err);
+    res.status(500).json({ error: 'No se pudo procesar el pedido' });
+  }
+});
+
+app.post('/fs2026confirmar-transferencia/:id', async (req, res) => {
+  if (!req.session.admin) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT * FROM pedidos WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) { await conn.end(); return res.status(404).json({ error: 'Pedido no encontrado' }); }
+    const pedido = rows[0];
+
+    const nombresFotos = pedido.fotos.split(',').map(s => s.trim());
+    const placeholders = nombresFotos.map(() => '?').join(',');
+    const [fotosRows] = await conn.execute(`SELECT * FROM fotos WHERE nombre IN (${placeholders})`, nombresFotos);
+
+    if (fotosRows.length > 0) {
+      const html = emailFotosHTML({ nombreComprador: pedido.nombre, fotos: fotosRows });
+      await enviarEmail({ to: pedido.email, subject: '¡Tus fotos de Foco Salvaje están listas!', html });
+    }
+
+    await conn.execute('UPDATE pedidos SET estado = "exitoso" WHERE id = ?', [req.params.id]);
+    await conn.end();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error confirmando pago por transferencia:', err);
+    res.status(500).json({ error: 'No se pudo confirmar el pago' });
   }
 });
 
@@ -1419,6 +1497,13 @@ app.get('/fs2026pedidos', async (req, res) => {
   .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block}
   .badge.pendiente{background:#fef3c7;color:#d97706}
   .badge.exitoso{background:#d1fae5;color:#065f46}
+  .badge.pendiente_verificacion{background:#fde68a;color:#92400e}
+  .metodo-pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px}
+  .metodo-pill.transferencia{background:#e0e7ff;color:#3730a3}
+  .metodo-pill.mercadopago{background:#dbeafe;color:#1e40af}
+  .btn-confirmar-transf{background:#1D9E75;color:white;border:none;padding:6px 13px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:600}
+  .btn-confirmar-transf:hover{background:#159965}
+  .ver-comprobante{font-size:11px;color:#1d5e8c;text-decoration:none;font-weight:600;display:inline-block;margin-top:4px}
   .btn-entregar{border:none;padding:6px 13px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;font-weight:600;transition:all 0.2s}
   .btn-entregar.no{background:#f3f4f6;color:#6b7280}
   .btn-entregar.no:hover{background:#04342C;color:white}
@@ -1487,6 +1572,8 @@ app.get('/fs2026pedidos', async (req, res) => {
       <div>
         <div class="pedido-card-num">#${r.displayNum}</div>
         <div class="pedido-card-nombre">${r.nombre}</div>
+        <span class="metodo-pill ${r.metodo_pago || 'mercadopago'}">${r.metodo_pago === 'transferencia' ? '🏦 Transferencia' : '💳 MercadoPago'}</span>
+        ${r.comprobante_url ? `<br><a class="ver-comprobante" href="${r.comprobante_url}" target="_blank">📎 Ver comprobante</a>` : ''}
         <div class="pedido-card-email">
           <span id="email-card-${r.id}">${r.email}</span>
           <button onclick="toggleEmailEdit(${r.id})">✏️</button>
@@ -1496,7 +1583,7 @@ app.get('/fs2026pedidos', async (req, res) => {
           <button onclick="guardarEmailCard(${r.id})" style="border:none;background:#04342C;color:white;padding:5px 9px;border-radius:6px;cursor:pointer;font-size:11px;">OK</button>
         </div>
       </div>
-      <span class="badge ${r.estado}">${r.estado}</span>
+      <span class="badge ${r.estado}">${r.estado === 'pendiente_verificacion' ? 'a verificar' : r.estado}</span>
     </div>
     <div class="pedido-card-fotos">📷 ${r.fotos}</div>
     <div class="pedido-card-meta">
@@ -1504,6 +1591,7 @@ app.get('/fs2026pedidos', async (req, res) => {
       <div class="pedido-card-fecha">${new Date(r.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})}</div>
     </div>
     <div class="pedido-card-btns">
+      ${r.estado === 'pendiente_verificacion' ? `<button class="btn-confirmar-transf" onclick="confirmarTransferencia(${r.id})">✓ Confirmar pago</button>` : ''}
       <button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button>
       <button onclick="reenviarFotos(${r.id})" style="background:#e0f2fe;color:#075985;">📧 Reenviar</button>
       <button onclick="eliminarPedido(${r.id})" style="background:#fee2e2;color:#991b1b;">🗑 Eliminar</button>
@@ -1513,7 +1601,7 @@ app.get('/fs2026pedidos', async (req, res) => {
   <div class="table-wrap">
     <div class="table-scroll">
       <table>
-        <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Estado</th><th>Entregado</th><th>Fecha</th><th></th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Nombre</th><th>Email</th><th>Fotos</th><th>Total</th><th>Método</th><th>Estado</th><th>Entregado</th><th>Fecha</th><th></th><th></th></tr></thead>
         <tbody>
           ${paginated.map(r => `<tr id="pedido-${r.id}">
             <td><strong>${r.displayNum}</strong></td>
@@ -1526,7 +1614,11 @@ app.get('/fs2026pedidos', async (req, res) => {
             </td>
             <td style="max-width:260px;white-space:normal;word-break:break-word;line-height:1.4">${r.fotos}</td>
             <td><strong>$ ${parseFloat(r.total).toLocaleString('es-AR')}</strong></td>
-            <td><span class="badge ${r.estado}">${r.estado}</span></td>
+            <td>
+              <span class="metodo-pill ${r.metodo_pago || 'mercadopago'}">${r.metodo_pago === 'transferencia' ? '🏦 Transf.' : '💳 MP'}</span>
+              ${r.comprobante_url ? `<br><a class="ver-comprobante" href="${r.comprobante_url}" target="_blank">📎 Comprobante</a>` : ''}
+            </td>
+            <td><span class="badge ${r.estado}">${r.estado === 'pendiente_verificacion' ? 'a verificar' : r.estado}</span>${r.estado === 'pendiente_verificacion' ? `<br><button class="btn-confirmar-transf" style="margin-top:6px" onclick="confirmarTransferencia(${r.id})">✓ Confirmar pago</button>` : ''}</td>
             <td><button class="btn-entregar ${r.entregado?'si':'no'}" onclick="toggleEntregar(${r.id},this)">${r.entregado?'✓ Entregado':'Entregar'}</button></td>
             <td style="white-space:nowrap">${new Date(r.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})}</td>
             <td><button onclick="eliminarPedido(${r.id})" style="border:none;background:#fee2e2;color:#991b1b;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🗑</button></td>
@@ -1608,6 +1700,17 @@ async function reenviarFotos(id){
     location.reload();
   }
   else alert('Error: '+(data.error||'No se pudo reenviar'));
+}
+async function confirmarTransferencia(id){
+  if(!confirm('¿Confirmar este pago por transferencia? Se le enviarán las fotos al comprador por email.'))return;
+  const res=await fetch('/fs2026confirmar-transferencia/'+id,{method:'POST'});
+  const data=await res.json();
+  if(data.ok){
+    alert('✓ Pago confirmado y fotos enviadas.');
+    location.reload();
+  } else {
+    alert('Error: '+(data.error||'No se pudo confirmar'));
+  }
 }
 async function toggleEntregar(id,btn){
   const res=await fetch('/fs2026entregar/'+id,{method:'POST'});

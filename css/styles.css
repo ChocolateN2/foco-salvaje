@@ -179,6 +179,33 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .checkout-btn:disabled{background:var(--txt3);transform:none;cursor:not-allowed}
 .cart-secure{display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;color:var(--txt3);padding:0 28px 18px;text-align:center}
 
+/* TRANSFERENCIA BANCARIA */
+.checkout-btn-transf{background:white;color:var(--v0);border:1.5px solid var(--v0)}
+.checkout-btn-transf:hover{background:var(--crema2)}
+.transf-modal{position:fixed;inset:0;z-index:600;background:rgba(4,30,24,0.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.transf-modal.open{display:flex}
+.transf-modal-inner{position:relative;background:white;border-radius:14px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto}
+.transf-modal-close{position:absolute;top:14px;right:14px;background:rgba(4,52,44,0.06);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;color:var(--txt2)}
+.transf-modal-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--v0);font-weight:700;margin-bottom:8px}
+.transf-modal-sub{font-size:13px;color:var(--txt2);line-height:1.6;margin-bottom:20px}
+.transf-datos{background:var(--crema);border-radius:10px;padding:14px 16px;margin-bottom:18px;display:flex;flex-direction:column;gap:10px}
+.transf-dato{display:flex;flex-direction:column;gap:2px;position:relative}
+.transf-dato-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--txt3)}
+.transf-dato-valor{font-size:14px;color:var(--txt);font-weight:500;word-break:break-all}
+.transf-copy-btn{position:absolute;right:0;top:14px;background:var(--v0);color:white;border:none;padding:4px 10px;border-radius:6px;font-size:10px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.transf-copy-btn:hover{background:var(--v2)}
+.transf-upload-wrap{border:2px dashed rgba(4,52,44,0.2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;position:relative;margin-bottom:14px;transition:border-color 0.2s}
+.transf-upload-wrap:hover{border-color:var(--v3)}
+.transf-upload-wrap input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.transf-upload-icon{font-size:24px;margin-bottom:6px}
+.transf-upload-label{font-size:13px;color:var(--txt2)}
+.transf-msg{font-size:12.5px;margin-bottom:10px;display:none;padding:8px 12px;border-radius:6px}
+.transf-msg.ok{display:block;background:#e3f7ee;color:#0a6b46}
+.transf-msg.err{display:block;background:#fdecec;color:#b3261e}
+.transf-confirmar-btn{width:100%;padding:13px;background:var(--v3);color:white;border:none;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;transition:background 0.2s}
+.transf-confirmar-btn:hover{background:#159965}
+.transf-confirmar-btn:disabled{background:var(--txt3);cursor:not-allowed}
+
 /* TOAST */
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--v0);color:white;padding:10px 18px;border-radius:2px;font-size:13px;display:none;align-items:center;gap:10px;z-index:400;border-left:3px solid var(--v3);box-shadow:0 8px 32px rgba(4,52,44,0.25);white-space:nowrap}
 .toast.show{display:flex;animation:fadeUp 0.3s ease}

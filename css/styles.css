@@ -61,8 +61,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 /* ── TARJETAS ── */
 .photo-card{background:white;border-radius:10px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:box-shadow 0.3s,transform 0.3s;box-shadow:0 2px 8px rgba(4,52,44,0.06)}
 .photo-card:hover{box-shadow:0 10px 28px rgba(4,52,44,0.14);transform:translateY(-3px)}
-.photo-thumb-wrap{position:relative;overflow:hidden;background:#f0ece4}
-.photo-thumb-wrap img{display:block;width:100%;height:auto;object-fit:contain;transition:transform 0.5s ease}
+.photo-thumb-wrap{position:relative;overflow:hidden;height:200px;background:#f0ece4;display:flex;align-items:center;justify-content:center}
+.photo-thumb-wrap img{width:100%;height:100%;object-fit:contain;transition:transform 0.5s ease}
 .photo-card:hover .photo-thumb-wrap img{transform:scale(1.06)}
 .photo-num-badge{position:absolute;top:7px;left:7px;background:rgba(4,52,44,0.4);color:rgba(255,255,255,0.75);font-size:8px;letter-spacing:1px;padding:2px 6px;border-radius:20px;backdrop-filter:blur(3px)}
 .photo-info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px;flex:1}

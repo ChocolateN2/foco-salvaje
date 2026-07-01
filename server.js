@@ -1442,12 +1442,14 @@ app.get('/fs2026pedidos', async (req, res) => {
     const filtroEstado = req.query.estado || '';
     const filtroFecha = req.query.fecha || '';
     const filtroEntregado = req.query.entregado || '';
+    const filtroMetodo = req.query.metodo || '';
     let filtered = rows.filter(r => {
       const matchQ = !busqueda || r.nombre.toLowerCase().includes(busqueda.toLowerCase()) || r.email.toLowerCase().includes(busqueda.toLowerCase());
       const matchEstado = !filtroEstado || r.estado === filtroEstado;
       const matchFecha = !filtroFecha || new Date(r.fecha).toISOString().slice(0,10) === filtroFecha;
       const matchEntregado = filtroEntregado === '' ? true : (filtroEntregado === '1' ? r.entregado == 1 : r.entregado == 0);
-      return matchQ && matchEstado && matchFecha && matchEntregado;
+      const matchMetodo = !filtroMetodo || (r.metodo_pago || 'mercadopago') === filtroMetodo;
+      return matchQ && matchEstado && matchFecha && matchEntregado && matchMetodo;
     });
     const total = filtered.length;
     const totalPages = Math.ceil(total / PER_PAGE);
@@ -1455,7 +1457,7 @@ app.get('/fs2026pedidos', async (req, res) => {
     const cobrados = rows.filter(r => r.estado === 'exitoso').length;
     const entregados = rows.filter(r => r.entregado == 1).length;
     const pendientes = rows.filter(r => r.estado === 'pendiente').length;
-    const qStr = (extra={}) => new URLSearchParams({ q: busqueda, estado: filtroEstado, fecha: filtroFecha, entregado: filtroEntregado, ...extra }).toString();
+    const qStr = (extra={}) => new URLSearchParams({ q: busqueda, estado: filtroEstado, fecha: filtroFecha, entregado: filtroEntregado, metodo: filtroMetodo, ...extra }).toString();
     res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pedidos — Foco Salvaje</title>
@@ -1556,6 +1558,7 @@ app.get('/fs2026pedidos', async (req, res) => {
       <div class="fg"><label>Buscar</label><input type="text" name="q" value="${busqueda}" placeholder="Nombre o email..."></div>
       <div class="fg"><label>Estado</label><select name="estado"><option value="">Todos</option><option value="pendiente" ${filtroEstado==='pendiente'?'selected':''}>Pendiente</option><option value="exitoso" ${filtroEstado==='exitoso'?'selected':''}>Exitoso</option></select></div>
       <div class="fg"><label>Entregado</label><select name="entregado"><option value="">Todos</option><option value="0" ${filtroEntregado==='0'?'selected':''}>No entregado</option><option value="1" ${filtroEntregado==='1'?'selected':''}>Entregado</option></select></div>
+      <div class="fg"><label>Método</label><select name="metodo"><option value="">Todos</option><option value="mercadopago" ${filtroMetodo==='mercadopago'?'selected':''}>💳 MercadoPago</option><option value="transferencia" ${filtroMetodo==='transferencia'?'selected':''}>🏦 Transferencia</option></select></div>
       <div class="fg"><label>Fecha</label><input type="date" name="fecha" value="${filtroFecha}"></div>
       <button class="btn-filter" type="submit">Filtrar</button>
       <a class="btn-clear" href="/fs2026pedidos">Limpiar</a>
